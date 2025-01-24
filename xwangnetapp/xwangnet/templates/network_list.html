@@ -1,0 +1,7 @@
+<h1>Docker Networks</h1>
+<ul>
+    {% for network in networks %}
+    <li>{{ network.name }} - {{ network.subnet }} - {{ network.gateway }}</li>
+    {% endfor %}
+</ul>
+<a href="{% url 'create_network' %}">Create New Network</a>

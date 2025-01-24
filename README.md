@@ -35,3 +35,5 @@ Improving Node Management
 3. 1 Fully Emulated Device
 
 4. Automation for Firmware Analysis [TBC]
+
+What other telemetry that can be retrieve from it.
