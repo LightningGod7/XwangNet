@@ -6,4 +6,5 @@ urlpatterns = [
     path('container/create/', views.create_container, name='create_container'),
     path('networks/', views.network_list, name='network_list'),
     path('containers/', views.container_list, name='container_list'),
+    path('compose-generator/', views.compose_generator, name='compose_generator'),
 ]

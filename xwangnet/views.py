@@ -45,3 +45,6 @@ def network_list(request):
 def container_list(request):
     containers = DockerContainer.objects.all()
     return render(request, 'container_list.html', {'containers': containers})
+
+def compose_generator(request):
+    return render(request, 'compose_generator.html')
