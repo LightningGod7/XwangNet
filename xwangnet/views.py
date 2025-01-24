@@ -45,7 +45,6 @@ def network_list(request):
     for network in networks:
         containers = []
         for container_id, container_attrs in network.attrs.get('Containers', {}).items():
-            print(containers)
             containers.append({
                 'id': container_id,
                 'name': container_attrs.get('Name'),
@@ -64,26 +63,6 @@ def container_list(request):
     containers = client.images.list()
     print(containers)  # Add this line to debug
     return render(request, 'container_list.html', {'containers': containers})
-
-
-def list_containers_in_network(network_name):
-    try:
-        # Get the network object by name
-        network = client.networks.get(network_name)
-
-        # Fetch containers connected to the network
-        containers = network.attrs.get("Containers", {})
-
-        if containers:
-            print(f"Containers in network '{network_name}':")
-            for container_id, container_details in containers.items():
-                print(f"- {container_details['Name']} (ID: {container_id})")
-        else:
-            print(f"No containers are connected to the network '{network_name}'.")
-    except docker.errors.NotFound:
-        print(f"Network '{network_name}' not found.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
 
 
 def compose_generator(request):
