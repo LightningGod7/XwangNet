@@ -1,7 +1,7 @@
 <h1>Docker Containers</h1>
 <ul>
     {% for container in containers %}
-    <li>{{ container.name }} - {{ container.image }} - {{ container.network.name }}</li>
+    <li>{{ container.short_id }} - {{ container.tags }}</li>
     {% endfor %}
 </ul>
 <a href="{% url 'create_container' %}">Create New Container</a>

@@ -43,7 +43,9 @@ def network_list(request):
     return render(request, 'network_list.html', {'networks': networks})
 
 def container_list(request):
-    containers = DockerContainer.objects.all()
+    #containers = DockerContainer.objects.all()
+    containers = client.images.list()
+    print(containers)  # Add this line to debug
     return render(request, 'container_list.html', {'containers': containers})
 
 def compose_generator(request):
