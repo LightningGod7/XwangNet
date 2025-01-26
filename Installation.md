@@ -19,10 +19,14 @@ pipx ensurepath
 ```
 
 Restart terminal
+
+## Getting Started
 ```shell
 poetry install
 poetry run python manage.py makemigrations
 poetry run python manage.py migrate
+poetry run python manage.py createsuperuser
+poetry run python manage.py sync_docker_images
 python manage.py runserver
 ```
 

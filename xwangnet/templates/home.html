@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}XwangNet - Network Digital Twin{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="text-center mb-5">
+                <h1 class="display-4">XwangNet</h1>
+                <p class="lead">Edge/Embedded Device Network Emulation Platform</p>
+            </div>
+
+            <div class="row mb-5">
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Device Management</h5>
+                            <p class="card-text">Select from a variety of pre-configured network devices or add your own custom devices through the admin interface.</p>
+                            <a href="{% url 'device_selection' %}" class="btn btn-primary">Browse Devices</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Network Configuration</h5>
+                            <p class="card-text">Create and manage isolated network environments with custom subnet configurations and network types.</p>
+                            <a href="{% url 'network_list' %}" class="btn btn-primary">View Networks</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Container Management</h5>
+                            <p class="card-text">Monitor and control your deployed containers with real-time status updates and logs.</p>
+                            <a href="{% url 'container_list' %}" class="btn btn-primary">View Containers</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h2>How It Works</h2>
+                    <ol class="list-group list-group-numbered mb-4">
+                        <li class="list-group-item">Select devices from our catalog of pre-configured network devices</li>
+                        <li class="list-group-item">Configure network parameters including subnet, gateway, and network type</li>
+                        <li class="list-group-item">Review and deploy your network configuration</li>
+                        <li class="list-group-item">Manage and monitor your running network environment</li>
+                    </ol>
+                    <div class="text-center">
+                        <a href="{% url 'device_selection' %}" class="btn btn-lg btn-success">Get Started</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h3>Features</h3>
+                            <ul class="list-unstyled">
+                                <li>✓ Docker-based network isolation</li>
+                                <li>✓ Custom network topology creation</li>
+                                <li>✓ Real-time container monitoring</li>
+                                <li>✓ Pre-configured device templates</li>
+                                <li>✓ Easy deployment and management</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h3>Getting Started</h3>
+                            <p>New to XwangNet? Follow these steps:</p>
+                            <ol>
+                                <li>Browse available devices in our catalog</li>
+                                <li>Select devices for your network</li>
+                                <li>Configure network parameters</li>
+                                <li>Deploy and start managing your network</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

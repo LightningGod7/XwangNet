@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}Select Devices{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Select Devices for Network</h1>
+    
+    <form method="post" class="mb-4">
+        {% csrf_token %}
+        
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+            {% for device in form.devices.field.queryset %}
+            <div class="col">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ device.name }}</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">Version {{ device.version }}</h6>
+                        <p class="card-text">{{ device.description }}</p>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" 
+                                   name="devices" value="{{ device.id }}" 
+                                   id="device_{{ device.id }}"
+                                   {% if device.id in form.devices.value %}checked{% endif %}>
+                            <label class="form-check-label" for="device_{{ device.id }}">
+                                Select this device
+                            </label>
+                        </div>
+                    </div>
+                    <div class="card-footer">
+                        <small class="text-muted">Image: {{ device.image }}</small>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="alert alert-info">
+                    No devices available. Please add devices through the admin interface or run:
+                    <code>python manage.py populate_devices</code>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="mt-4">
+            <button type="submit" class="btn btn-primary">Continue to Network Configuration</button>
+        </div>
+    </form>
+</div>
+{% endblock %} 

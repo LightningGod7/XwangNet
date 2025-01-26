@@ -1,0 +1,306 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+            <div class="position-sticky pt-3">
+                <h6 class="sidebar-heading px-3 mt-4 mb-1 text-muted">
+                    Deployments
+                </h6>
+                <ul class="nav flex-column">
+                    {% for d in deployments %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if d.id == deployment.id %}active{% endif %}" 
+                           href="{% url 'deployment_detail' d.id %}">
+                            {{ d.name }}
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <div class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1>{{ deployment.name }}</h1>
+                <div class="btn-toolbar mb-2 mb-md-0">
+                    <button onclick="deleteDeployment()" class="btn btn-danger">Delete Deployment</button>
+                </div>
+            </div>
+
+            <p class="lead">{{ deployment.description }}</p>
+
+            <!-- Network Controls -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    Network Configuration
+                </div>
+                <div class="card-body">
+                    <h5>{{ deployment.network.name }}</h5>
+                    <p>Status: <span id="network-status" class="badge bg-{{ deployment.network_status|yesno:'success,danger' }}">
+                        {{ deployment.network_status }}
+                    </span></p>
+                    <div class="network-actions">
+                        <button onclick="toggleNetwork('up')" 
+                                class="btn btn-success" 
+                                {% if deployment.network_status == 'up' %}disabled{% endif %}>
+                            Start Network
+                        </button>
+                        <button onclick="toggleNetwork('down')" 
+                                class="btn btn-danger"
+                                {% if deployment.network_status == 'down' %}disabled{% endif %}>
+                            Stop Network
+                        </button>
+                    </div>
+                    <div id="network-error" class="alert alert-danger mt-3" style="display: none;"></div>
+                </div>
+            </div>
+
+            <!-- Container Controls -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Containers</span>
+                    <div>
+                        <button onclick="startAll()" class="btn btn-success btn-sm">Start All</button>
+                        <button onclick="stopAll()" class="btn btn-danger btn-sm">Stop All</button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% for container in deployment.containers.all %}
+                    <div class="container-item mb-4" id="container-{{ container.id }}">
+                        <h5>{{ container.device.name }}</h5>
+                        <p>Status: <span class="container-status badge bg-{{ container.status|yesno:'success,danger' }}">
+                            {{ container.status }}
+                        </span></p>
+                        <div class="btn-group mb-2">
+                            <button onclick="containerAction({{ container.id }}, 'start')" 
+                                    class="btn btn-success btn-sm"
+                                    {% if container.status == 'running' %}disabled{% endif %}>
+                                Start
+                            </button>
+                            <button onclick="containerAction({{ container.id }}, 'stop')" 
+                                    class="btn btn-danger btn-sm"
+                                    {% if container.status == 'stopped' %}disabled{% endif %}>
+                                Stop
+                            </button>
+                            <button onclick="containerAction({{ container.id }}, 'restart')" 
+                                    class="btn btn-warning btn-sm"
+                                    {% if container.status == 'stopped' %}disabled{% endif %}>
+                                Restart
+                            </button>
+                        </div>
+                        <div class="logs-container" style="max-height: 200px; overflow-y: auto;">
+                            <pre class="container-logs bg-dark text-light p-2" id="logs-{{ container.id }}"></pre>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Add this at the beginning of the script section
+const deploymentId = {{ deployment.id }};
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+const csrftoken = getCookie('csrftoken');
+
+async function toggleNetwork(action) {
+    const networkStatus = document.getElementById('network-status');
+    const buttons = document.querySelectorAll('.network-actions button');
+    const errorDiv = document.getElementById('network-error');
+    
+    // Hide previous error
+    errorDiv.style.display = 'none';
+    
+    // Disable all buttons during operation
+    buttons.forEach(btn => btn.disabled = true);
+    
+    try {
+        const response = await fetch(`/deployment/${deploymentId}/network/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken,
+            },
+            body: JSON.stringify({ action })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            networkStatus.textContent = data.network_status;
+            networkStatus.className = `badge bg-${data.network_status === 'up' ? 'success' : 'danger'}`;
+            
+            // Update button states
+            document.querySelector('button[onclick="toggleNetwork(\'up\')"]').disabled = 
+                data.network_status === 'up';
+            document.querySelector('button[onclick="toggleNetwork(\'down\')"]').disabled = 
+                data.network_status === 'down';
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (error) {
+        // Show error in the network card
+        errorDiv.textContent = `Network operation failed: ${error.message}`;
+        errorDiv.style.display = 'block';
+    } finally {
+        buttons.forEach(btn => btn.disabled = false);
+    }
+}
+
+async function containerAction(containerId, action) {
+    const containerDiv = document.getElementById(`container-${containerId}`);
+    const buttons = containerDiv.querySelectorAll('button');
+    const statusSpan = containerDiv.querySelector('.container-status');
+    
+    buttons.forEach(btn => btn.disabled = true);
+    
+    try {
+        const response = await fetch(`/container/${containerId}/action/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken,
+            },
+            body: JSON.stringify({ action })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            statusSpan.textContent = data.container_status;
+            statusSpan.className = `container-status badge bg-${data.container_status === 'running' ? 'success' : 'danger'}`;
+            
+            // Update button states
+            containerDiv.querySelector('button[onclick*="start"]').disabled = 
+                data.container_status === 'running';
+            containerDiv.querySelector('button[onclick*="stop"]').disabled = 
+                data.container_status === 'stopped';
+            containerDiv.querySelector('button[onclick*="restart"]').disabled = 
+                data.container_status === 'stopped';
+            
+            // Start log polling if container is running
+            if (data.container_status === 'running') {
+                startLogPolling(containerId);
+            }
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (error) {
+        showAlert('error', `Container operation failed: ${error.message}`);
+    } finally {
+        buttons.forEach(btn => btn.disabled = false);
+    }
+}
+
+function startLogPolling(containerId) {
+    const logContainer = document.getElementById(`logs-${containerId}`);
+    
+    async function pollLogs() {
+        try {
+            const response = await fetch(`/container/${containerId}/logs/`);
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                logContainer.textContent = data.logs;
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        } catch (error) {
+            console.error('Error polling logs:', error);
+        }
+    }
+    
+    // Poll every 5 seconds
+    pollLogs();
+    return setInterval(pollLogs, 5000);
+}
+
+async function startAll() {
+    const containers = document.querySelectorAll('.container-item');
+    for (const container of containers) {
+        const containerId = container.id.split('-')[1];
+        const statusSpan = container.querySelector('.container-status');
+        if (statusSpan.textContent.trim() === 'stopped') {
+            await containerAction(containerId, 'start');
+        }
+    }
+}
+
+async function stopAll() {
+    const containers = document.querySelectorAll('.container-item');
+    for (const container of containers) {
+        const containerId = container.id.split('-')[1];
+        const statusSpan = container.querySelector('.container-status');
+        if (statusSpan.textContent.trim() === 'running') {
+            await containerAction(containerId, 'stop');
+        }
+    }
+}
+
+async function deleteDeployment() {
+    if (!confirm('Are you sure you want to delete this deployment? This action cannot be undone.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/deployment/${deploymentId}/`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRFToken': csrftoken,
+            }
+        });
+        
+        if (response.ok) {
+            window.location.href = '/deployments/';
+        } else {
+            const data = await response.json();
+            throw new Error(data.message);
+        }
+    } catch (error) {
+        showAlert('error', `Failed to delete deployment: ${error.message}`);
+    }
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    document.querySelector('.col-md-9').insertBefore(alertDiv, document.querySelector('.d-flex'));
+}
+
+// Initialize log polling for running containers
+document.addEventListener('DOMContentLoaded', () => {
+    const containers = document.querySelectorAll('.container-item');
+    containers.forEach(container => {
+        const statusSpan = container.querySelector('.container-status');
+        if (statusSpan.textContent.trim() === 'running') {
+            const containerId = container.id.split('-')[1];
+            startLogPolling(containerId);
+        }
+    });
+});
+</script>
+{% endblock %} 
