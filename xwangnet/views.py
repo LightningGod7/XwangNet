@@ -4,7 +4,9 @@ from .models import DockerNetwork, DockerContainer, DeviceTemplate, NetworkConfi
 from .forms import DockerNetworkForm, DockerContainerForm, NetworkConfigurationForm, DeviceInstanceForm, ComposeGeneratorForm
 import docker
 import yaml
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
+import json
+from django.template.loader import render_to_string
 
 client = docker.from_env()
 
@@ -34,7 +36,8 @@ def create_container(request):
                 network=container.network.name,
                 command=container.command,
                 environment=container.environment_vars.splitlines() if container.environment_vars else None,
-                detach=True
+                detach=True,
+                remove=True
             )
             return redirect('container_list')
     else:
@@ -209,7 +212,9 @@ def create_deployment(request):
 
 def toggle_network(request, deployment_id):
     deployment = get_object_or_404(Deployment, id=deployment_id)
-    action = request.POST.get('action')
+    data = json.loads(request.body)
+    action = data.get('action')
+    client = docker.from_env()
     
     try:
         if action == 'up' and deployment.network_status == 'down':
@@ -235,7 +240,6 @@ def toggle_network(request, deployment_id):
                         ]
                     )
                 )
-                
                 deployment.docker_network_id = network.id
                 deployment.network_status = 'up'
                 deployment.save()
@@ -244,16 +248,6 @@ def toggle_network(request, deployment_id):
                 return JsonResponse({
                     'status': 'error',
                     'message': f'Docker API Error: {str(e)}'
-                }, status=500)
-            except docker.errors.NotFound as e:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': f'Network driver not found: {str(e)}'
-                }, status=500)
-            except Exception as e:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': f'Failed to create network: {str(e)}'
                 }, status=500)
                 
         elif action == 'down' and deployment.network_status == 'up':
@@ -289,22 +283,36 @@ def toggle_network(request, deployment_id):
 
 def container_action(request, container_id):
     container = get_object_or_404(DeployedContainer, id=container_id)
-    action = request.POST.get('action')
+    data = json.loads(request.body)
+    action = data.get('action')
     
     try:
         if action == 'start' and container.deployment.network_status == 'up':
+            # Get image ID
+            try:
+                image = client.images.get(container.device.image)
+                image_id = image.id
+            except docker.errors.ImageNotFound:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Image {container.device.image} not found'
+                }, status=404)
+            
+            # Create container with image ID
             docker_container = client.containers.run(
-                container.device.image,
-                name=container.hostname,
+                image_id,
+                name=f"{container.hostname}-{container.id}",
                 hostname=container.hostname,
                 network=container.deployment.network.name,
                 environment=container.device.environment,
                 ports=container.device.ports,
-                detach=True
+                detach=True,
+                remove=True
             )
             container.container_id = docker_container.id
             container.status = 'running'
             container.save()
+            
         elif action in ['stop', 'restart'] and container.container_id:
             docker_container = client.containers.get(container.container_id)
             if action == 'stop':
@@ -319,14 +327,40 @@ def container_action(request, container_id):
             'container_status': container.status,
             'container_id': container.container_id
         })
+    except docker.errors.APIError as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Docker API Error: {str(e)}'
+        }, status=500)
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
 
 def container_logs(request, container_id):
     container = get_object_or_404(DeployedContainer, id=container_id)
+    client = docker.from_env()
+    
     try:
-        docker_container = client.containers.get(container.container_id)
-        logs = docker_container.logs(tail=100).decode('utf-8')
-        return JsonResponse({'status': 'success', 'logs': logs})
+        if container.container_id and container.status == 'running':
+            docker_container = client.containers.get(container.container_id)
+            logs = docker_container.logs(tail=100).decode('utf-8')
+            return JsonResponse({'status': 'success', 'logs': logs})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Container not running'})
+    except docker.errors.NotFound:
+        return JsonResponse({'status': 'error', 'message': 'Container not found'})
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({'status': 'error', 'message': str(e)})
+
+def container_buttons(request, container_id):
+    container = get_object_or_404(DeployedContainer, id=container_id)
+    status = request.GET.get('status', container.status)
+    
+    html = render_to_string('container_buttons.html', {
+        'container': container,
+        'status': status,
+        'deployment': container.deployment
+    })
+    return HttpResponse(html)

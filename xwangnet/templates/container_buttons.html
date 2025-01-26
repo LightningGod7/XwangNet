@@ -1,0 +1,18 @@
+<div class="btn-group mb-2">
+    {% if status == 'stopped' %}
+    <button onclick="containerAction({{ container.id }}, 'start')" 
+            class="btn btn-success btn-sm"
+            {% if deployment.network_status == 'down' %}disabled{% endif %}>
+        Start
+    </button>
+    {% else %}
+    <button onclick="containerAction({{ container.id }}, 'restart')" 
+            class="btn btn-warning btn-sm">
+        Restart
+    </button>
+    <button onclick="containerAction({{ container.id }}, 'stop')" 
+            class="btn btn-danger btn-sm">
+        Stop
+    </button>
+    {% endif %}
+</div> 

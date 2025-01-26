@@ -16,5 +16,6 @@ urlpatterns = [
     path('deployment/<int:deployment_id>/', views.deployment_detail, name='deployment_detail'),
     path('deployment/<int:deployment_id>/network/', views.toggle_network, name='toggle_network'),
     path('container/<int:container_id>/action/', views.container_action, name='container_action'),
-    path('container/<int:container_id>/logs/', views.container_logs, name='container_logs'),
+    path('container/<int:container_id>/logs/', views.container_logs, name='container-logs'),
+    path('container/<int:container_id>/buttons/', views.container_buttons, name='container-buttons'),
 ]

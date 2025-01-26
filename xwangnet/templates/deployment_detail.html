@@ -71,29 +71,38 @@
                 <div class="card-body">
                     {% for container in deployment.containers.all %}
                     <div class="container-item mb-4" id="container-{{ container.id }}">
-                        <h5>{{ container.device.name }}</h5>
+                        <h5>{{ container.device.name }} ({{ container.hostname }})</h5>
                         <p>Status: <span class="container-status badge bg-{{ container.status|yesno:'success,danger' }}">
                             {{ container.status }}
                         </span></p>
                         <div class="btn-group mb-2">
+                            {% if container.status == 'stopped' %}
                             <button onclick="containerAction({{ container.id }}, 'start')" 
                                     class="btn btn-success btn-sm"
-                                    {% if container.status == 'running' %}disabled{% endif %}>
+                                    {% if deployment.network_status == 'down' %}disabled{% endif %}>
                                 Start
                             </button>
-                            <button onclick="containerAction({{ container.id }}, 'stop')" 
-                                    class="btn btn-danger btn-sm"
-                                    {% if container.status == 'stopped' %}disabled{% endif %}>
-                                Stop
-                            </button>
+                            {% else %}
                             <button onclick="containerAction({{ container.id }}, 'restart')" 
-                                    class="btn btn-warning btn-sm"
-                                    {% if container.status == 'stopped' %}disabled{% endif %}>
+                                    class="btn btn-warning btn-sm">
                                 Restart
                             </button>
+                            <button onclick="containerAction({{ container.id }}, 'stop')" 
+                                    class="btn btn-danger btn-sm">
+                                Stop
+                            </button>
+                            {% endif %}
                         </div>
-                        <div class="logs-container" style="max-height: 200px; overflow-y: auto;">
-                            <pre class="container-logs bg-dark text-light p-2" id="logs-{{ container.id }}"></pre>
+                        <div id="container-error-{{ container.id }}" class="alert alert-danger mt-2" style="display: none;"></div>
+                        <!-- Add logs section -->
+                        <div class="logs-section mt-2">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h6 class="mb-0">Logs</h6>
+                                <button onclick="toggleLogs({{ container.id }})" class="btn btn-sm btn-outline-secondary">
+                                    Show/Hide Logs
+                                </button>
+                            </div>
+                            <pre id="logs-{{ container.id }}" class="container-logs mt-2" style="display: none;"></pre>
                         </div>
                     </div>
                     {% endfor %}
@@ -123,6 +132,8 @@ function getCookie(name) {
 }
 
 const csrftoken = getCookie('csrftoken');
+
+let logPollingIntervals = {};
 
 async function toggleNetwork(action) {
     const networkStatus = document.getElementById('network-status');
@@ -172,7 +183,13 @@ async function containerAction(containerId, action) {
     const containerDiv = document.getElementById(`container-${containerId}`);
     const buttons = containerDiv.querySelectorAll('button');
     const statusSpan = containerDiv.querySelector('.container-status');
+    const errorDiv = document.getElementById(`container-error-${containerId}`);
+    const logsDiv = document.getElementById(`logs-${containerId}`);
     
+    // Hide previous error
+    errorDiv.style.display = 'none';
+    
+    // Disable all buttons during operation
     buttons.forEach(btn => btn.disabled = true);
     
     try {
@@ -192,47 +209,77 @@ async function containerAction(containerId, action) {
             statusSpan.className = `container-status badge bg-${data.container_status === 'running' ? 'success' : 'danger'}`;
             
             // Update button states
-            containerDiv.querySelector('button[onclick*="start"]').disabled = 
-                data.container_status === 'running';
-            containerDiv.querySelector('button[onclick*="stop"]').disabled = 
-                data.container_status === 'stopped';
-            containerDiv.querySelector('button[onclick*="restart"]').disabled = 
-                data.container_status === 'stopped';
+            containerDiv.querySelector('.btn-group').innerHTML = await updateContainerButtons(containerId, data.container_status);
             
-            // Start log polling if container is running
+            // Start or stop log polling based on container status
             if (data.container_status === 'running') {
                 startLogPolling(containerId);
+                logsDiv.style.display = 'block';
+            } else {
+                stopLogPolling(containerId);
+                logsDiv.style.display = 'none';
             }
         } else {
             throw new Error(data.message);
         }
     } catch (error) {
-        showAlert('error', `Container operation failed: ${error.message}`);
+        // Show error in the container's error div
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
     } finally {
         buttons.forEach(btn => btn.disabled = false);
     }
 }
 
+// Helper function to update container buttons based on status
+async function updateContainerButtons(containerId, status) {
+    const response = await fetch(`/container/${containerId}/buttons/?status=${status}`);
+    return await response.text();
+}
+
+function toggleLogs(containerId) {
+    const logsDiv = document.getElementById(`logs-${containerId}`);
+    if (logsDiv.style.display === 'none') {
+        logsDiv.style.display = 'block';
+        startLogPolling(containerId);
+    } else {
+        logsDiv.style.display = 'none';
+        stopLogPolling(containerId);
+    }
+}
+
 function startLogPolling(containerId) {
-    const logContainer = document.getElementById(`logs-${containerId}`);
-    
-    async function pollLogs() {
-        try {
-            const response = await fetch(`/container/${containerId}/logs/`);
-            const data = await response.json();
-            
-            if (data.status === 'success') {
-                logContainer.textContent = data.logs;
-                logContainer.scrollTop = logContainer.scrollHeight;
-            }
-        } catch (error) {
-            console.error('Error polling logs:', error);
-        }
+    if (logPollingIntervals[containerId]) {
+        clearInterval(logPollingIntervals[containerId]);
     }
     
-    // Poll every 5 seconds
-    pollLogs();
-    return setInterval(pollLogs, 5000);
+    // Initial logs fetch
+    fetchLogs(containerId);
+    
+    // Set up polling every 2 seconds
+    logPollingIntervals[containerId] = setInterval(() => {
+        fetchLogs(containerId);
+    }, 2000);
+}
+
+function stopLogPolling(containerId) {
+    if (logPollingIntervals[containerId]) {
+        clearInterval(logPollingIntervals[containerId]);
+        delete logPollingIntervals[containerId];
+    }
+}
+
+async function fetchLogs(containerId) {
+    try {
+        const response = await fetch(`/container/${containerId}/logs/`);
+        const data = await response.json();
+        if (data.logs) {
+            const logsDiv = document.getElementById(`logs-${containerId}`);
+            logsDiv.textContent = data.logs;
+        }
+    } catch (error) {
+        console.error('Error fetching logs:', error);
+    }
 }
 
 async function startAll() {
@@ -291,16 +338,50 @@ function showAlert(type, message) {
     document.querySelector('.col-md-9').insertBefore(alertDiv, document.querySelector('.d-flex'));
 }
 
-// Initialize log polling for running containers
-document.addEventListener('DOMContentLoaded', () => {
-    const containers = document.querySelectorAll('.container-item');
-    containers.forEach(container => {
-        const statusSpan = container.querySelector('.container-status');
-        if (statusSpan.textContent.trim() === 'running') {
-            const containerId = container.id.split('-')[1];
-            startLogPolling(containerId);
-        }
+// Clean up polling intervals when leaving the page
+window.addEventListener('beforeunload', () => {
+    Object.keys(logPollingIntervals).forEach(containerId => {
+        stopLogPolling(containerId);
     });
 });
 </script>
+
+<style>
+.container-item {
+    border: 1px solid #dee2e6;
+    padding: 15px;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+}
+
+.alert {
+    margin-top: 10px;
+    padding: 8px 15px;
+    border-radius: 4px;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.container-logs {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    padding: 10px;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.logs-section {
+    border-top: 1px solid #dee2e6;
+    padding-top: 10px;
+}
+</style>
 {% endblock %} 

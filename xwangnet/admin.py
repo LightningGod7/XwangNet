@@ -100,32 +100,39 @@ class DeploymentAdmin(admin.ModelAdmin):
     list_display = ('name', 'network_name', 'network_status', 'container_count', 'created_at')
     list_filter = ('network_status', 'created_at', 'network')
     search_fields = ('name', 'description', 'network__name')
-    readonly_fields = ('created_at', 'network_status')
+    readonly_fields = ('created_at', 'network_status', 'docker_network_id')
+    raw_id_fields = ('network',)
     
     fieldsets = (
         ('Basic Information', {
             'fields': ('name', 'description', 'created_at')
         }),
         ('Network Configuration', {
-            'fields': ('network', 'network_status')
+            'fields': ('network', 'network_status', 'docker_network_id')
         }),
     )
 
     def network_name(self, obj):
-        return obj.network.name
+        return obj.network.name if obj.network else '-'
     network_name.short_description = 'Network'
-    
-    def container_count(self, obj):
-        return obj.containers.count()
-    container_count.short_description = 'Containers'
+    network_name.admin_order_field = 'network__name'
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        if 'network' in form.base_fields:
+            form.base_fields['network'].label_from_instance = lambda obj: f"{obj.name} ({obj.subnet})"
+        return form
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
         extra_context = extra_context or {}
         deployment = self.get_object(request, object_id)
-        
-        # Add containers to context
         extra_context['containers'] = deployment.containers.all()
+        extra_context['show_network_controls'] = True
         return super().change_view(request, object_id, form_url, extra_context)
+
+    def container_count(self, obj):
+        return obj.containers.count()
+    container_count.short_description = 'Containers'
 
     def get_urls(self):
         urls = super().get_urls()
@@ -184,14 +191,24 @@ class DeploymentAdmin(admin.ModelAdmin):
         
         try:
             if action == 'start' and deployment.network_status == 'up':
+                # Get image ID
+                try:
+                    image = client.images.get(container.device.image)
+                    image_id = image.id
+                except docker.errors.ImageNotFound:
+                    messages.error(request, f'Image {container.device.image} not found')
+                    return redirect('admin:xwangnet_deployment_change', deployment_id)
+                
+                # Create container with image ID
                 docker_container = client.containers.run(
-                    container.device.image,
-                    name=container.hostname,
+                    image_id,
+                    name=f"{container.hostname}-{container.id}",
                     hostname=container.hostname,
                     network=deployment.network.name,
                     environment=container.device.environment,
                     ports=container.device.ports,
-                    detach=True
+                    detach=True,
+                    remove=True
                 )
                 container.container_id = docker_container.id
                 container.status = 'running'
@@ -208,7 +225,50 @@ class DeploymentAdmin(admin.ModelAdmin):
                 container.save()
                 messages.success(request, f'Container {container.hostname} {action}ed successfully')
                 
+        except docker.errors.APIError as e:
+            messages.error(request, f'Docker API Error: {str(e)}')
         except Exception as e:
             messages.error(request, f'Error: {str(e)}')
             
         return redirect('admin:xwangnet_deployment_change', deployment_id)
+
+@admin.register(DeployedContainer)
+class DeployedContainerAdmin(admin.ModelAdmin):
+    list_display = ('hostname', 'deployment_name', 'device_name', 'status', 'container_id_short', 'created_at')
+    list_filter = ('status', 'created_at', 'deployment')
+    search_fields = ('hostname', 'deployment__name', 'device__name')
+    readonly_fields = ('deployment', 'device', 'hostname', 'container_id', 'status', 'created_at')
+    
+    fieldsets = (
+        ('Container Information', {
+            'fields': ('hostname', 'status', 'container_id', 'created_at')
+        }),
+        ('Relationships', {
+            'fields': ('deployment', 'device')
+        }),
+    )
+
+    def deployment_name(self, obj):
+        return obj.deployment.name
+    deployment_name.short_description = 'Deployment'
+    deployment_name.admin_order_field = 'deployment__name'
+    
+    def device_name(self, obj):
+        return obj.device.name
+    device_name.short_description = 'Device'
+    device_name.admin_order_field = 'device__name'
+    
+    def container_id_short(self, obj):
+        if obj.container_id:
+            return obj.container_id[:12]
+        return '-'
+    container_id_short.short_description = 'Container ID'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
