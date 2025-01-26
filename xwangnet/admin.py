@@ -89,12 +89,6 @@ class NetworkConfigurationAdmin(admin.ModelAdmin):
     list_filter = ('network_type', 'is_active')
     search_fields = ('name',)
 
-@admin.register(DeviceInstance)
-class DeviceInstanceAdmin(admin.ModelAdmin):
-    list_display = ('template', 'network', 'hostname', 'status')
-    list_filter = ('status', 'created_at')
-    search_fields = ('hostname',)
-
 @admin.register(Deployment)
 class DeploymentAdmin(admin.ModelAdmin):
     list_display = ('name', 'network_name', 'network_status', 'container_count', 'created_at')
