@@ -1,7 +1,76 @@
-<h1>Docker Containers</h1>
-<ul>
-    {% for container in containers %}
-    <li>{{ container.short_id }} - {{ container.tags }}</li>
-    {% endfor %}
-</ul>
-<a href="{% url 'create_container' %}">Create New Container</a>
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Docker Containers</h1>
+        <div class="stats-summary">
+            <span class="badge bg-success">{{ running_count }} Running</span>
+            <span class="badge bg-secondary">{{ total_count }} Total</span>
+        </div>
+    </div>
+
+    {% if messages %}
+    <div class="messages mb-4">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if deployment_containers %}
+        {% for deployment, containers in deployment_containers.items %}
+        <div class="deployment-section mb-5">
+            <h3 class="deployment-title mb-3">
+                {{ deployment.name }}
+                <span class="badge bg-info">{{ containers|length }} containers</span>
+                <span class="badge {% if deployment.network_status == 'up' %}bg-success{% else %}bg-danger{% endif %}">
+                    Network {{ deployment.network_status }}
+                </span>
+            </h3>
+            <div class="row">
+                {% for container in containers %}
+                    {% include "container_card.html" with container=container %}
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="alert alert-info">
+            <h4 class="alert-heading">No containers found</h4>
+            <p>There are no active deployments with containers.</p>
+        </div>
+    {% endif %}
+</div>
+
+<style>
+.deployment-title {
+    border-bottom: 2px solid #dee2e6;
+    padding-bottom: 0.5rem;
+}
+
+.deployment-section {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.stats-summary .badge {
+    font-size: 1rem;
+    margin-left: 10px;
+}
+
+.deployment-title .badge {
+    margin-left: 10px;
+}
+</style>
+
+{% if deployment_containers %}
+<script>
+setTimeout(function() {
+    location.reload();
+}, 30000);
+</script>
+{% endif %}
+{% endblock %}
