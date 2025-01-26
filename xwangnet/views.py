@@ -31,104 +31,111 @@ def network_list(request):
     return render(request, 'network_list.html', {'networks': networks_data})
 
 def container_list(request):
+    return render(request, 'container_list.html', {
+        'initial_load': True
+    })
+
+def container_list_api(request):
     client = docker.from_env()
-    
-    # Get all deployments
     deployments = Deployment.objects.all().prefetch_related('containers')
-    deployment_containers = {deployment: [] for deployment in deployments}
+    result = {}
     
-    # Get all containers first
     try:
         docker_containers = client.containers.list(all=True)
+        container_map = {c.id: c for c in docker_containers}
+        
+        for deployment in deployments:
+            containers_data = []
+            for deployed_container in deployment.containers.all():
+                try:
+                    if deployed_container.container_id in container_map:
+                        container = container_map[deployed_container.container_id]
+                        
+                        # Get container stats if running
+                        stats = {
+                            'cpu_usage': 0,
+                            'mem_usage': 0,
+                            'mem_limit': 0,
+                            'mem_percent': 0
+                        }
+                        
+                        if container.status == 'running':
+                            try:
+                                container_stats = container.stats(stream=False)
+                                
+                                # Calculate CPU usage
+                                cpu_delta = container_stats['cpu_stats']['cpu_usage']['total_usage'] - \
+                                          container_stats['precpu_stats']['cpu_usage']['total_usage']
+                                system_delta = container_stats['cpu_stats']['system_cpu_usage'] - \
+                                             container_stats['precpu_stats']['system_cpu_usage']
+                                cpu_usage = (cpu_delta / system_delta) * 100 * \
+                                          len(container_stats['cpu_stats']['cpu_usage']['percpu_usage'])
+                                
+                                # Calculate memory usage
+                                mem_usage = container_stats['memory_stats']['usage']
+                                mem_limit = container_stats['memory_stats']['limit']
+                                mem_percent = (mem_usage / mem_limit) * 100
+                                
+                                stats = {
+                                    'cpu_usage': round(cpu_usage, 2),
+                                    'mem_usage': round(mem_usage / (1024 * 1024), 2),
+                                    'mem_limit': round(mem_limit / (1024 * 1024), 2),
+                                    'mem_percent': round(mem_percent, 2)
+                                }
+                            except Exception as e:
+                                print(f"Error getting stats for container {container.name}: {str(e)}")
+                        
+                        # Get health status
+                        health_status = "No health check"
+                        health_log = []
+                        if 'Health' in container.attrs.get('State', {}):
+                            health_status = container.attrs['State']['Health']['Status']
+                            health_log = container.attrs['State']['Health']['Log'][-3:]
+                        
+                        container_info = {
+                            'id': container.short_id,
+                            'name': deployed_container.hostname,
+                            'status': container.status,
+                            'image': container.image.tags[0] if container.image.tags else container.image.short_id,
+                            'created': container.attrs['Created'],
+                            'ports': container.ports,
+                            'network': deployment.network.name if deployment.network else None,
+                            'health_status': health_status,
+                            'health_log': health_log,
+                            'device_name': deployed_container.device.name,
+                            **stats
+                        }
+                        containers_data.append(container_info)
+                        
+                except Exception as e:
+                    print(f"Error processing container {deployed_container.hostname}: {str(e)}")
+                    continue
+            
+            if containers_data:
+                result[deployment.id] = {
+                    'name': deployment.name,
+                    'network_status': deployment.network_status,
+                    'containers': containers_data
+                }
+        
+        running_count = sum(1 for containers in result.values() 
+                          for c in containers['containers'] if c['status'] == 'running')
+        total_count = sum(len(containers['containers']) for containers in result.values())
+        
+        return JsonResponse({
+            'status': 'success',
+            'data': {
+                'deployments': result,
+                'running_count': running_count,
+                'total_count': total_count
+            }
+        })
+        
     except Exception as e:
-        print(f"Error getting containers: {str(e)}")
-        docker_containers = []
-
-    # Create a mapping of container IDs to Docker container objects
-    container_map = {c.id: c for c in docker_containers}
-    
-    # Process each deployment's containers
-    for deployment in deployments:
-        for deployed_container in deployment.containers.all():
-            try:
-                # Try to find the Docker container
-                if deployed_container.container_id in container_map:
-                    container = container_map[deployed_container.container_id]
-                    
-                    # Get container stats if running
-                    if container.status == 'running':
-                        try:
-                            stats = container.stats(stream=False)
-                            
-                            # Calculate CPU usage
-                            cpu_delta = stats['cpu_stats']['cpu_usage']['total_usage'] - \
-                                      stats['precpu_stats']['cpu_usage']['total_usage']
-                            system_delta = stats['cpu_stats']['system_cpu_usage'] - \
-                                         stats['precpu_stats']['system_cpu_usage']
-                            cpu_usage = (cpu_delta / system_delta) * 100 * \
-                                      len(stats['cpu_stats']['cpu_usage']['percpu_usage'])
-                            
-                            # Calculate memory usage
-                            mem_usage = stats['memory_stats']['usage']
-                            mem_limit = stats['memory_stats']['limit']
-                            mem_percent = (mem_usage / mem_limit) * 100
-                            mem_usage_mb = mem_usage / (1024 * 1024)
-                            mem_limit_mb = mem_limit / (1024 * 1024)
-                        except Exception as e:
-                            print(f"Error getting stats for container {container.name}: {str(e)}")
-                            cpu_usage = 0
-                            mem_usage_mb = 0
-                            mem_limit_mb = 0
-                            mem_percent = 0
-                    else:
-                        cpu_usage = 0
-                        mem_usage_mb = 0
-                        mem_limit_mb = 0
-                        mem_percent = 0
-                    
-                    # Get health status
-                    health_status = "No health check"
-                    health_log = []
-                    if 'Health' in container.attrs.get('State', {}):
-                        health_status = container.attrs['State']['Health']['Status']
-                        health_log = container.attrs['State']['Health']['Log'][-3:]
-                    
-                    container_info = {
-                        'id': container.short_id,
-                        'name': deployed_container.hostname,  # Use hostname from DeployedContainer
-                        'status': container.status,
-                        'image': container.image.tags[0] if container.image.tags else container.image.short_id,
-                        'cpu_usage': round(cpu_usage, 2),
-                        'mem_usage': round(mem_usage_mb, 2),
-                        'mem_limit': round(mem_limit_mb, 2),
-                        'mem_percent': round(mem_percent, 2),
-                        'created': container.attrs['Created'],
-                        'ports': container.ports,
-                        'network': deployment.network.name if deployment.network else None,
-                        'health_status': health_status,
-                        'health_log': health_log,
-                        'device_name': deployed_container.device.name  # Add device name
-                    }
-                    
-                    deployment_containers[deployment].append(container_info)
-                
-            except Exception as e:
-                print(f"Error processing container {deployed_container.hostname}: {str(e)}")
-                continue
-    
-    # Filter out empty deployments
-    deployment_containers = {k: v for k, v in deployment_containers.items() if v}
-    
-    # Count running containers
-    running_count = sum(1 for containers in deployment_containers.values() 
-                       for c in containers if c['status'] == 'running')
-    total_count = sum(len(containers) for containers in deployment_containers.values())
-    
-    return render(request, 'container_list.html', {
-        'deployment_containers': deployment_containers,
-        'running_count': running_count,
-        'total_count': total_count
-    })
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
 
 def device_selection(request):
     if request.method == 'POST':

@@ -17,4 +17,5 @@ urlpatterns = [
     path('container/<int:container_id>/logs/', views.container_logs, name='container-logs'),
     path('container/<int:container_id>/buttons/', views.container_buttons, name='container-buttons'),
     path('containers/<str:container_id>/remove/', views.remove_container, name='remove_container'),
+    path('api/containers/', views.container_list_api, name='container_list_api'),
 ]
