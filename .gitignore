@@ -1,4 +1,12 @@
-*/__pycache__
-venv/
-*.sqlite3
+# Ignore all __pycache__ directories and their contents
+__pycache__/
+*/__pycache__/
+
+# Ignore all .pyc files globally
 *.pyc
+
+# Ignore the virtual environment
+venv/
+
+# Ignore SQLite database files
+*.sqlite3
