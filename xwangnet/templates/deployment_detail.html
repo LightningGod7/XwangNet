@@ -61,12 +61,25 @@
 
             <!-- Container Controls -->
             <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <span>Containers</span>
-                    <div>
-                        <button onclick="startAll()" class="btn btn-success btn-sm">Start All</button>
-                        <button onclick="stopAll()" class="btn btn-danger btn-sm">Stop All</button>
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span>Containers</span>
+                        <div>
+                            <button onclick="startAll()" class="btn btn-success btn-sm">Start All</button>
+                            <button onclick="stopAll()" class="btn btn-danger btn-sm">Stop All</button>
+                        </div>
                     </div>
+                    <!-- 
+                    TODO: Allow adding of new container into deployment
+                    <div class="d-flex gap-2">
+                        <select id="device-template" class="form-select">
+                            <option value="">Select Device Template</option>
+                            {% for device in device_templates %}
+                            <option value="{{ device.id }}">{{ device.name }} ({{ device.version }})</option>
+                            {% endfor %}
+                        </select>
+                        <button onclick="addContainer()" class="btn btn-primary">Add Container</button>
+                    </div> -->
                 </div>
                 <div class="card-body">
                     {% for container in deployment.containers.all %}
@@ -75,7 +88,8 @@
                         <p>Status: <span class="container-status badge bg-{{ container.status|yesno:'success,danger' }}">
                             {{ container.status }}
                         </span></p>
-                        <div class="btn-group mb-2">
+                        <div class="d-flex gap-2 mb-2">
+                            <div class="btn-group">
                             {% if container.status == 'stopped' %}
                             <button onclick="containerAction({{ container.id }}, 'start')" 
                                     class="btn btn-success btn-sm"
@@ -92,6 +106,13 @@
                                 Stop
                             </button>
                             {% endif %}
+                            </div>
+                            <form method="POST" action="{% url 'delete_deployed_container' container.id %}" 
+                                  onsubmit="return confirm('Are you sure you want to delete this container?')" 
+                                  style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+                            </form>
                         </div>
                         <div id="container-error-{{ container.id }}" class="alert alert-danger mt-2" style="display: none;"></div>
                         <!-- Add logs section -->
@@ -113,6 +134,35 @@
 </div>
 
 <script>
+function addContainer() {
+    const deviceSelect = document.getElementById('device-template');
+    const deviceId = deviceSelect.value;
+    
+    if (!deviceId) {
+        showAlert('warning', 'Please select a device template');
+        return;
+    }
+    
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/deployment/${deploymentId}/add-container/`;
+    
+    const csrfInput = document.createElement('input');
+    csrfInput.type = 'hidden';
+    csrfInput.name = 'csrfmiddlewaretoken';
+    csrfInput.value = csrftoken;
+    
+    const deviceInput = document.createElement('input');
+    deviceInput.type = 'hidden';
+    deviceInput.name = 'device_id';
+    deviceInput.value = deviceId;
+    
+    form.appendChild(csrfInput);
+    form.appendChild(deviceInput);
+    document.body.appendChild(form);
+    form.submit();
+}
+
 // Add this at the beginning of the script section
 const deploymentId = {{ deployment.id }};
 
@@ -384,4 +434,4 @@ window.addEventListener('beforeunload', () => {
     padding-top: 10px;
 }
 </style>
-{% endblock %} 
+{% endblock %}

@@ -504,3 +504,66 @@ def remove_container(request, container_id):
             messages.error(request, f'Error removing container: {str(e)}')
             
     return redirect('container_list')
+
+def delete_deployed_container(request, container_id):
+    if request.method == 'POST':
+        container = get_object_or_404(DeployedContainer, id=container_id)
+        deployment_id = container.deployment.id
+        
+        try:
+            # If container is running in Docker, stop and remove it
+            if container.container_id and container.status == 'running':
+                try:
+                    docker_container = client.containers.get(container.container_id)
+                    docker_container.stop()
+                    docker_container.remove()
+                except docker.errors.NotFound:
+                    pass  # Container already removed from Docker
+                
+            # Delete the DeployedContainer record
+            container.delete()
+            messages.success(request, f'Container {container.hostname} removed from deployment')
+            
+        except Exception as e:
+            messages.error(request, f'Error removing container: {str(e)}')
+        
+        return redirect('deployment_detail', deployment_id=deployment_id)
+    return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+def add_deployed_container(request, deployment_id):
+    if request.method == 'POST':
+        deployment = get_object_or_404(Deployment, id=deployment_id)
+        device_id = request.POST.get('device_id')
+        
+        if not device_id:
+            messages.error(request, 'Device template is required')
+            return redirect('deployment_detail', deployment_id=deployment_id)
+            
+        try:
+            device = DeviceTemplate.objects.get(id=device_id)
+            
+            # Generate unique hostname
+            base_hostname = f"{device.name}-{deployment.name}"
+            existing_count = DeployedContainer.objects.filter(
+                deployment=deployment,
+                hostname__startswith=base_hostname
+            ).count()
+            hostname = f"{base_hostname}-{existing_count + 1}"
+            
+            # Create new container
+            DeployedContainer.objects.create(
+                deployment=deployment,
+                device=device,
+                hostname=hostname,
+                status='stopped'
+            )
+            
+            messages.success(request, f'Container {hostname} added to deployment')
+            
+        except DeviceTemplate.DoesNotExist:
+            messages.error(request, 'Invalid device template')
+        except Exception as e:
+            messages.error(request, f'Error adding container: {str(e)}')
+            
+        return redirect('deployment_detail', deployment_id=deployment_id)
+    return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
