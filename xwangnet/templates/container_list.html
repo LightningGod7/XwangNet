@@ -186,7 +186,7 @@ function generateHealthCheck(container) {
             </div>
             <div class="collapse" id="healthCheck${container.id}">
                 <div class="health-check-content">
-                    ${Array.isArray(container.health_log) ? container.health_log.map(check => `
+                    ${container.health_log.map(check => `
                         <div class="health-check-item ${check.ExitCode === 0 ? 'text-success' : 'text-danger'}">
                             <div class="d-flex justify-content-between align-items-center">
                                 <span>
@@ -201,7 +201,7 @@ function generateHealthCheck(container) {
                                 ${check.Output}
                             </div>
                         </div>
-                    `).join('') : '<div class="health-check-item">No health logs</div>'}
+                    `).join('')}
                 </div>
             </div>
         </div>

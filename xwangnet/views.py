@@ -114,11 +114,7 @@ def container_list_api(request):
                                 print(f"Error getting stats for container {deployed_container.hostname}: {str(e)}")
 
                         health_log = container.attrs.get('State', {}).get('Health', {}).get('Log', [])
-                        # Ensure health_log is a list before using list operations
-                        if isinstance(health_log, list):
-                            health_log = health_log[-3:]
-                        else:
-                            health_log = ['No health logs']
+                        health_log = health_log[-3:] if health_log else 'No health logs'
                         
                         # Get container info
                         container_info = {
