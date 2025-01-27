@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h1>Docker Compose Preview</h1>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Deployment Information</h5>
+            <form id="deploymentForm" class="needs-validation" novalidate>
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="deployment_name" class="form-label">Deployment Name</label>
+                    <input type="text" class="form-control" id="deployment_name" name="deployment_name" required>
+                    <div class="invalid-feedback">Please provide a deployment name.</div>
+                </div>
+                <div class="mb-3">
+                    <label for="deployment_description" class="form-label">Description</label>
+                    <textarea class="form-control" id="deployment_description" name="deployment_description" rows="3" required></textarea>
+                    <div class="invalid-feedback">Please provide a deployment description.</div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Docker Compose Configuration</h5>
+            <pre>{{ yaml_content }}</pre>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button onclick="deployCompose()" class="btn btn-success">Deploy</button>
+        <button onclick="downloadCompose()" class="btn btn-primary">Download</button>
+    </div>
+    
+    <div id="status" class="mt-4"></div>
+</div>
+
+<script>
+function deployCompose() {
+    const form = document.getElementById('deploymentForm');
+    const statusDiv = document.getElementById('status');
+    const deployButton = document.querySelector('.btn-success');
+    
+    if (!form.checkValidity()) {
+        form.classList.add('was-validated');
+        return;
+    }
+    
+    const formData = new FormData(form);
+    
+    deployButton.disabled = true;
+    deployButton.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Deploying...';
+    
+    statusDiv.innerHTML = '<div class="alert alert-info">Creating deployment...</div>';
+    
+    fetch('/compose/deploy/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            statusDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <h4>Deployment Created Successfully!</h4>
+                    <p>Redirecting to deployment management...</p>
+                </div>
+            `;
+            setTimeout(() => {
+                window.location.href = `/deployment/${data.deployment_id}/`;
+            }, 1500);
+        } else {
+            throw new Error(data.message);
+        }
+    })
+    .catch(error => {
+        statusDiv.innerHTML = `
+            <div class="alert alert-danger">
+                <h4>Deployment Failed</h4>
+                <p>${error.message}</p>
+            </div>
+        `;
+        deployButton.disabled = false;
+        deployButton.innerHTML = 'Deploy';
+    });
+}
+
+function downloadCompose() {
+    const blob = new Blob([`{{ yaml_content|escapejs }}`], { type: 'text/yaml' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'docker-compose.yml';
+    a.click();
+}
+</script>
+{% endblock %} 

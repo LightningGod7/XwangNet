@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Deployments</h1>
+        <a href="{% url 'device_selection' %}" class="btn btn-primary">
+            <i class="bi bi-plus"></i> New Deployment
+        </a>
+    </div>
+
+    {% if deployments %}
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Network Status</th>
+                    <th>Containers</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for deployment in deployments %}
+                <tr>
+                    <td>{{ deployment.name }}</td>
+                    <td>{{ deployment.description|truncatechars:50 }}</td>
+                    <td>
+                        <span class="badge bg-{{ deployment.network_status|yesno:'success,danger' }}">
+                            {{ deployment.network_status }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary">
+                            {{ deployment.containers.count }} containers
+                        </span>
+                    </td>
+                    <td>{{ deployment.created_at|date:"M d, Y H:i" }}</td>
+                    <td>
+                        <a href="{% url 'deployment_detail' deployment.id %}" 
+                           class="btn btn-sm btn-primary">
+                            Manage
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <h4 class="alert-heading">No deployments yet!</h4>
+        <p>Start by creating a new deployment using the button above.</p>
+        <hr>
+        <p class="mb-0">
+            You can select devices, configure the network, and manage your deployments all in one place.
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 

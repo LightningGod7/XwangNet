@@ -1,0 +1,17 @@
+<h1>Docker Networks</h1>
+<ul>
+    {% for network in networks %}
+    <li>{{ network.name }} - {{ network.short_id }}</li>
+        <ul>
+            {% for container in network.containers %}
+            <li>
+                <strong>Container Name:</strong> {{ container.name }}<br>
+                <strong>MacAddress:</strong> {{ container.mac_address }}<br>
+                <strong>IPv4Address:</strong> {{ container.ipv4_address }}
+            </li>
+            {% endfor %}
+        </ul>
+    {% endfor %}
+</ul>
+
+<a href="{% url 'create_network' %}">Create New Network</a>

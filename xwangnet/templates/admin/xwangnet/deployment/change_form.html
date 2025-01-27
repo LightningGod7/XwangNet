@@ -1,0 +1,103 @@
+{% extends "admin/change_form.html" %}
+{% load static %}
+
+{% block after_field_sets %}
+<div class="module">
+    {% if show_network_controls %}
+    <h2>Network Controls</h2>
+    <div class="network-controls">
+        {% if original.network_status == 'down' %}
+            <a href="{% url 'admin:toggle-network' original.pk %}?action=up" 
+               class="button default">Start Network</a>
+        {% else %}
+            <a href="{% url 'admin:toggle-network' original.pk %}?action=down" 
+               class="button default">Stop Network</a>
+        {% endif %}
+        <span class="network-status ml-2 {% if original.network_status == 'up' %}status-up{% else %}status-down{% endif %}">
+            {{ original.network_status|title }}
+        </span>
+    </div>
+    {% endif %}
+    
+    <h2>Containers</h2>
+    {% if containers %}
+    <table class="container-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Device</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for container in containers %}
+            <tr class="{% cycle 'row1' 'row2' %}">
+                <td>{{ container.hostname }}</td>
+                <td>{{ container.device.name }}</td>
+                <td>
+                    <span class="status-badge status-{{ container.status }}">
+                        {{ container.status }}
+                    </span>
+                </td>
+                <td class="container-actions">
+                    {% if container.status == 'stopped' %}
+                        <a href="{% url 'admin:container-action' original.pk container.pk %}?action=start" 
+                           class="button default">Start</a>
+                    {% else %}
+                        <a href="{% url 'admin:container-action' original.pk container.pk %}?action=restart" 
+                           class="button default">Restart</a>
+                        <a href="{% url 'admin:container-action' original.pk container.pk %}?action=stop" 
+                           class="button default">Stop</a>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="help">No containers available.</p>
+    {% endif %}
+</div>
+
+<style>
+    .network-controls {
+        margin-bottom: 20px;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+    .network-status {
+        padding: 4px 8px;
+        border-radius: 4px;
+        margin-left: 10px;
+    }
+    .status-up {
+        background-color: #28a745;
+        color: white;
+    }
+    .status-down {
+        background-color: #dc3545;
+        color: white;
+    }
+    .container-table {
+        width: 100%;
+        margin-top: 10px;
+    }
+    .container-actions {
+        white-space: nowrap;
+    }
+    .status-badge {
+        padding: 4px 8px;
+        border-radius: 4px;
+    }
+    .status-running {
+        background-color: #28a745;
+        color: white;
+    }
+    .status-stopped {
+        background-color: #dc3545;
+        color: white;
+    }
+</style>
+{% endblock %}

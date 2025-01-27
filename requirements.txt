@@ -1,0 +1,11 @@
+asgiref==3.8.1
+certifi==2024.12.14
+charset-normalizer==3.4.1
+Django==5.1.5
+docker==7.1.0
+idna==3.10
+PyYAML==6.0.2
+requests==2.32.3
+sqlparse==0.5.3
+urllib3==2.3.0
+-e git+https://github.com/LightningGod7/XwangNet.git@8336bcf0788f4afe3b4c224322445c745ffbab7a#egg=xwangnet
