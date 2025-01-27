@@ -51,7 +51,7 @@ def container_list_api(request):
                     if deployed_container.container_id in container_map:
                         container = container_map[deployed_container.container_id]
                         
-                        # Get container stats if running
+                        # Initialize stats
                         stats = {
                             'cpu_usage': 0,
                             'mem_usage': 0,
@@ -63,35 +63,59 @@ def container_list_api(request):
                             try:
                                 container_stats = container.stats(stream=False)
                                 
-                                # Calculate CPU usage
-                                cpu_delta = container_stats['cpu_stats']['cpu_usage']['total_usage'] - \
-                                          container_stats['precpu_stats']['cpu_usage']['total_usage']
-                                system_delta = container_stats['cpu_stats']['system_cpu_usage'] - \
-                                             container_stats['precpu_stats']['system_cpu_usage']
-                                cpu_usage = (cpu_delta / system_delta) * 100 * \
-                                          len(container_stats['cpu_stats']['cpu_usage']['percpu_usage'])
+                                # Calculate CPU usage with fallback options
+                                try:
+                                    cpu_delta = container_stats['cpu_stats']['cpu_usage']['total_usage'] - \
+                                              container_stats['precpu_stats']['cpu_usage']['total_usage']
+                                    system_delta = container_stats['cpu_stats']['system_cpu_usage'] - \
+                                                 container_stats['precpu_stats']['system_cpu_usage']
+                                    
+                                    # Get number of CPUs
+                                    if 'online_cpus' in container_stats['cpu_stats']:
+                                        num_cpus = container_stats['cpu_stats']['online_cpus']
+                                    elif 'percpu_usage' in container_stats['cpu_stats']['cpu_usage']:
+                                        num_cpus = len(container_stats['cpu_stats']['cpu_usage']['percpu_usage'])
+                                    else:
+                                        num_cpus = 1
+                                    
+                                    if system_delta > 0:
+                                        cpu_usage = (cpu_delta / system_delta) * 100 * num_cpus
+                                    else:
+                                        cpu_usage = 0
+                                        
+                                except (KeyError, TypeError, ZeroDivisionError) as e:
+                                    print(f"CPU calculation fallback for {deployed_container.hostname}: {str(e)}")
+                                    # Fallback to simpler CPU calculation
+                                    try:
+                                        cpu_usage = (container_stats['cpu_stats']['cpu_usage']['total_usage'] / 
+                                                   container_stats['cpu_stats']['system_cpu_usage']) * 100
+                                    except:
+                                        cpu_usage = 0
                                 
-                                # Calculate memory usage
-                                mem_usage = container_stats['memory_stats']['usage']
-                                mem_limit = container_stats['memory_stats']['limit']
-                                mem_percent = (mem_usage / mem_limit) * 100
+                                # Calculate memory usage with error handling
+                                try:
+                                    mem_usage = container_stats['memory_stats'].get('usage', 0)
+                                    mem_limit = container_stats['memory_stats'].get('limit', 0)
+                                    mem_percent = (mem_usage / mem_limit) * 100 if mem_limit > 0 else 0
+                                except (KeyError, ZeroDivisionError):
+                                    mem_usage = 0
+                                    mem_limit = 0
+                                    mem_percent = 0
                                 
                                 stats = {
-                                    'cpu_usage': round(cpu_usage, 2),
+                                    'cpu_usage': round(max(0, min(cpu_usage, 100)), 2),  # Clamp between 0-100
                                     'mem_usage': round(mem_usage / (1024 * 1024), 2),
                                     'mem_limit': round(mem_limit / (1024 * 1024), 2),
                                     'mem_percent': round(mem_percent, 2)
                                 }
+                                
                             except Exception as e:
-                                print(f"Error getting stats for container {container.name}: {str(e)}")
+                                print(f"Error getting stats for container {deployed_container.hostname}: {str(e)}")
+
+                        health_log = container.attrs.get('State', {}).get('Health', {}).get('Log', [])
+                        health_log = health_log[-3:] if health_log else 'No health logs'
                         
-                        # Get health status
-                        health_status = "No health check"
-                        health_log = []
-                        if 'Health' in container.attrs.get('State', {}):
-                            health_status = container.attrs['State']['Health']['Status']
-                            health_log = container.attrs['State']['Health']['Log'][-3:]
-                        
+                        # Get container info
                         container_info = {
                             'id': container.short_id,
                             'name': deployed_container.hostname,
@@ -100,7 +124,7 @@ def container_list_api(request):
                             'created': container.attrs['Created'],
                             'ports': container.ports,
                             'network': deployment.network.name if deployment.network else None,
-                            'health_status': health_status,
+                            'health_status': container.attrs.get('State', {}).get('Health', {}).get('Status', 'No health check'),
                             'health_log': health_log,
                             'device_name': deployed_container.device.name,
                             **stats
