@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2>Network Management</h2>
+    
+    {% if subnet_clashes %}
+    <div class="alert alert-warning">
+        <h4>Subnet Conflicts Detected:</h4>
+        <ul>
+        {% for clash in subnet_clashes %}
+            <li>
+                <strong>{{ clash.status }}:</strong> 
+                {{ clash.network1 }} ({{ clash.subnet1 }}) overlaps with 
+                {{ clash.network2 }} ({{ clash.subnet2 }})
+            </li>
+        {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+    
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Driver</th>
+                <th>Subnet</th>
+                <th>Gateway</th>
+                <th>Status</th>
+                <th>Containers</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for network in networks %}
+            <tr>
+                <td>
+                    <a href="#" class="network-details-toggle" data-bs-toggle="collapse" 
+                       data-bs-target="#network-{{ network.id|slugify }}" 
+                       aria-expanded="false">
+                        {{ network.name }}
+                        <i class="fas fa-chevron-down ms-1"></i>
+                    </a>
+                </td>
+                <td>{{ network.driver }}</td>
+                <td>{{ network.subnet }}</td>
+                <td>{{ network.gateway }}</td>
+                <td>
+                    <span class="{% if network.status == 'active' %}bg-success{% else %}bg-warning{% endif %} badge" 
+                          style="color: {% if network.status == 'active' %}white{% else %}#212529{% endif %}">
+                        {{ network.status }}
+                    </span>
+                </td>
+                <td>{{ network.container_count }}</td>
+                <td>
+                    {% if network.status == 'active' %}
+                        <button class="btn btn-danger btn-sm network-action" 
+                                data-network-id="{{ network.id }}" 
+                                data-action="stop">Stop</button>
+                    {% else %}
+                        <button class="btn btn-success btn-sm network-action" 
+                                data-network-id="{{ network.id }}" 
+                                data-action="start">Start</button>
+                        <button class="btn btn-danger btn-sm network-action" 
+                                data-network-id="{{ network.id }}" 
+                                data-action="delete">Delete</button>
+                    {% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td colspan="7" class="p-0">
+                    <div class="collapse" id="network-{{ network.id|slugify }}">
+                        <div class="card card-body m-2">
+                            <h5>Network Details</h5>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6>Basic Information</h6>
+                                    <ul class="list-unstyled">
+                                        <li><strong>ID:</strong> {{ network.id }}</li>
+                                        <li><strong>Created:</strong> {{ network.created_at|default:"N/A" }}</li>
+                                        <li><strong>Scope:</strong> {{ network.scope|default:"local" }}</li>
+                                        <li><strong>Internal:</strong> {{ network.internal|default:"false" }}</li>
+                                        <li><strong>IPv6 Enabled:</strong> {{ network.enable_ipv6|default:"false" }}</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Connected Containers</h6>
+                                    {% if network.containers %}
+                                        <ul>
+                                        {% for container in network.containers %}
+                                            <li>
+                                                <strong>{{ container.name }}</strong>
+                                                <ul>
+                                                    <li>IPv4: {{ container.ipv4_address|default:"N/A" }}</li>
+                                                    <li>MAC: {{ container.mac_address|default:"N/A" }}</li>
+                                                </ul>
+                                            </li>
+                                        {% endfor %}
+                                        </ul>
+                                    {% else %}
+                                        <p>No containers connected</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+.badge.bg-warning {
+    color: #212529 !important;
+}
+
+.badge.bg-success {
+    color: white !important;
+}
+
+.network-details-toggle {
+    text-decoration: none;
+    color: inherit;
+}
+
+.network-details-toggle:hover {
+    text-decoration: none;
+    color: #0056b3;
+}
+
+.network-details-toggle i {
+    transition: transform 0.2s;
+}
+
+.network-details-toggle[aria-expanded="true"] i {
+    transform: rotate(180deg);
+}
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+document.querySelectorAll('.network-action').forEach(button => {
+    button.addEventListener('click', function() {
+        const networkId = this.dataset.networkId;
+        const action = this.dataset.action;
+        const csrftoken = getCookie('csrftoken');
+        
+        fetch(`/networks/${networkId}/action/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': csrftoken
+            },
+            body: `action=${action}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error performing network action');
+        });
+    });
+});
+</script>
+{% endblock %} 
