@@ -3,7 +3,6 @@ from . import views
 
 urlpatterns = [
     path('', views.home, name='home'),
-    path('networks/', views.network_list, name='network_list'),
     path('containers/', views.container_list, name='container_list'),
     path('compose-generator/', views.compose_generator, name='compose_generator'),
     path('devices/select/', views.device_selection, name='device_selection'),
@@ -20,4 +19,6 @@ urlpatterns = [
     path('containers/<str:container_id>/remove/', views.remove_container, name='remove_container'),
     path('api/containers/', views.container_list_api, name='container_list_api'),
     path('deployed-container/<int:container_id>/delete/', views.delete_deployed_container, name='delete_deployed_container'),
+    path('networks/', views.networks, name='networks'),
+    path('networks/<str:network_id>/action/', views.network_action, name='network_action'),
 ]

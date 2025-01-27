@@ -613,3 +613,156 @@ def add_deployed_container(request, deployment_id):
             
         return redirect('deployment_detail', deployment_id=deployment_id)
     return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+def networks(request):
+    """View for managing Docker networks and their configurations"""
+    client = docker.from_env()
+    
+    # Get all networks from Docker and database
+    docker_networks = client.networks.list()
+    db_networks = NetworkConfiguration.objects.all()
+    
+    # Collect all subnets for clash detection
+    network_subnets = []
+    for network in docker_networks:
+        # Safely get IPAM config with proper error handling
+        ipam_config = network.attrs.get('IPAM', {}).get('Config', [])
+        if ipam_config:  # Only process if IPAM config exists
+            for config in ipam_config:
+                subnet = config.get('Subnet')
+                if subnet:
+                    network_subnets.append({
+                        'subnet': subnet,
+                        'network_name': network.name,
+                        'is_active': True
+                    })
+    
+    # Add planned networks from database
+    for network in db_networks:
+        network_subnets.append({
+            'subnet': network.subnet,
+            'network_name': network.name,
+            'is_active': False
+        })
+    
+    # Detect subnet clashes
+    subnet_clashes = []
+    for i, net1 in enumerate(network_subnets):
+        for net2 in network_subnets[i+1:]:
+            if is_subnet_overlap(net1['subnet'], net2['subnet']):
+                clash = {
+                    'network1': net1['network_name'],
+                    'network2': net2['network_name'],
+                    'subnet1': net1['subnet'],
+                    'subnet2': net2['subnet'],
+                    'status': 'Active Conflict' if net1['is_active'] and net2['is_active'] else 'Planning Conflict'
+                }
+                subnet_clashes.append(clash)
+    
+    # Prepare network data for template with safer attribute access
+    networks_data = []
+    for network in docker_networks:
+        # Get IPAM config safely with proper fallback
+        ipam_configs = network.attrs.get('IPAM', {}).get('Config', [])
+        ipam_config = ipam_configs[0] if ipam_configs else {}
+        
+        # Get container information
+        containers = []
+        for container_id, container_attrs in network.attrs.get('Containers', {}).items():
+            containers.append({
+                'id': container_id,
+                'name': container_attrs.get('Name'),
+                'mac_address': container_attrs.get('MacAddress'),
+                'ipv4_address': container_attrs.get('IPv4Address'),
+            })
+        
+        network_info = {
+            'id': network.id,
+            'name': network.name,
+            'driver': network.attrs.get('Driver', 'unknown'),
+            'subnet': ipam_config.get('Subnet', 'N/A'),
+            'gateway': ipam_config.get('Gateway', 'N/A'),
+            'status': 'active',
+            'container_count': len(network.attrs.get('Containers', {})),
+            'containers': containers,
+            'created_at': network.attrs.get('Created'),
+            'scope': network.attrs.get('Scope'),
+            'internal': network.attrs.get('Internal', False),
+            'enable_ipv6': network.attrs.get('EnableIPv6', False),
+        }
+        networks_data.append(network_info)
+    
+    # Add planned networks from database
+    for network in db_networks:
+        if not any(n['name'] == network.name for n in networks_data):
+            network_info = {
+                'id': f'planned_{network.id}',
+                'name': network.name,
+                'driver': network.network_type,
+                'subnet': network.subnet,
+                'gateway': network.gateway,
+                'status': 'planned',
+                'container_count': 0
+            }
+            networks_data.append(network_info)
+    
+    context = {
+        'networks': networks_data,
+        'subnet_clashes': subnet_clashes,
+    }
+    
+    return render(request, 'networks.html', context)
+
+def network_action(request, network_id):
+    """Handle network actions (start/stop/delete)"""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+    
+    action = request.POST.get('action')
+    client = docker.from_env()
+    
+    try:
+        if network_id.startswith('planned_'):
+            # Handle planned network actions
+            db_network = get_object_or_404(NetworkConfiguration, id=network_id.replace('planned_', ''))
+            
+            if action == 'start':
+                # Create the network in Docker
+                network = client.networks.create(
+                    name=db_network.name,
+                    driver=db_network.network_type,
+                    ipam=docker.types.IPAMConfig(
+                        pool_configs=[
+                            docker.types.IPAMPool(
+                                subnet=db_network.subnet,
+                                gateway=db_network.gateway
+                            )
+                        ]
+                    )
+                )
+                return JsonResponse({'status': 'success', 'message': f'Network {db_network.name} created'})
+            
+            elif action == 'delete':
+                db_network.delete()
+                return JsonResponse({'status': 'success', 'message': 'Network configuration deleted'})
+        
+        else:
+            # Handle active network actions
+            network = client.networks.get(network_id)
+            
+            if action == 'stop':
+                network.remove()
+                return JsonResponse({'status': 'success', 'message': f'Network {network.name} removed'})
+            
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+def is_subnet_overlap(subnet1, subnet2):
+    """Helper function to check if two subnets overlap"""
+    try:
+        from ipaddress import ip_network
+        net1 = ip_network(subnet1, strict=False)
+        net2 = ip_network(subnet2, strict=False)
+        return net1.overlaps(net2)
+    except ValueError:
+        return False
