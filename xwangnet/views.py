@@ -7,6 +7,7 @@ import yaml
 from django.http import JsonResponse, HttpResponse
 import json
 from django.template.loader import render_to_string
+from django.core.paginator import Paginator
 
 client = docker.from_env()
 
@@ -299,9 +300,14 @@ def home(request):
     return render(request, 'home.html')
 
 def deployment_list(request):
-    deployments = Deployment.objects.all().order_by('-created_at')
+    deployments = Deployment.objects.all().order_by('-created_at').select_related('network')  # Adjust 'related_field' as needed
+    paginator = Paginator(deployments, 1)  # Show 1 deployments per page
+
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
     return render(request, 'deployment_list.html', {
-        'deployments': deployments
+        'page_obj': page_obj
     })
 
 def deployment_detail(request, deployment_id):
