@@ -304,8 +304,50 @@ def deployment_detail(request, deployment_id):
     deployment = get_object_or_404(Deployment, id=deployment_id)
     return render(request, 'deployment_detail.html', {
         'deployment': deployment,
-        'deployments': Deployment.objects.all().order_by('-created_at')
+        'deployments': Deployment.objects.all().order_by('-created_at'),
+        'device_templates': DeviceTemplate.objects.all()
     })
+
+def add_containers_to_deployment(request, deployment_id):
+    if request.method == 'POST':
+        try:
+            deployment = get_object_or_404(Deployment, id=deployment_id)
+            data = json.loads(request.body)
+            device_counts = data.get('device_counts', {})
+            
+            for device_id, count in device_counts.items():
+                device = DeviceTemplate.objects.get(id=device_id)
+                for i in range(count):
+                    # Generate unique hostname
+                    base_hostname = f"{device.name}-{deployment.name}"
+                    existing_count = DeployedContainer.objects.filter(
+                        deployment=deployment,
+                        hostname__startswith=base_hostname
+                    ).count()
+                    hostname = f"{base_hostname}-{existing_count + i + 1}"
+                    
+                    DeployedContainer.objects.create(
+                        deployment=deployment,
+                        device=device,
+                        hostname=hostname,
+                        status='stopped'
+                    )
+            
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Containers added successfully'
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': str(e)
+            }, status=500)
+            
+    return JsonResponse({
+        'status': 'error',
+        'message': 'Method not allowed'
+    }, status=405)
 
 def create_deployment(request):
     if request.method == 'POST':

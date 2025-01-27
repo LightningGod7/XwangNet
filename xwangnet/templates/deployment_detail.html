@@ -67,19 +67,59 @@
                         <div>
                             <button onclick="startAll()" class="btn btn-success btn-sm">Start All</button>
                             <button onclick="stopAll()" class="btn btn-danger btn-sm">Stop All</button>
+                            <button onclick="openDeviceModal()" class="btn btn-primary btn-sm ms-2">Add Devices</button>
                         </div>
                     </div>
-                    <!-- 
-                    TODO: Allow adding of new container into deployment
-                    <div class="d-flex gap-2">
-                        <select id="device-template" class="form-select">
-                            <option value="">Select Device Template</option>
-                            {% for device in device_templates %}
-                            <option value="{{ device.id }}">{{ device.name }} ({{ device.version }})</option>
-                            {% endfor %}
-                        </select>
-                        <button onclick="addContainer()" class="btn btn-primary">Add Container</button>
-                    </div> -->
+
+                    <!-- Device Selection Modal -->
+                    <div class="modal fade" id="deviceModal" tabindex="-1" aria-labelledby="deviceModalLabel" aria-hidden="true">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="deviceModalLabel">Add Devices</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <!-- Search input -->
+                                    <div class="mb-3">
+                                        <input type="text" class="form-control" id="deviceSearch" 
+                                               placeholder="Search devices..." onkeyup="filterDevices()">
+                                    </div>
+
+                                    <!-- Device cards -->
+                                    <div class="row row-cols-1 row-cols-md-2 g-4" id="deviceCards">
+                                        {% for device in device_templates %}
+                                        <div class="col device-card" data-device-name="{{ device.name|lower }}">
+                                            <div class="card h-100">
+                                                <div class="card-body">
+                                                    <h5 class="card-title">{{ device.name }}</h5>
+                                                    <h6 class="card-subtitle mb-2 text-muted">Version {{ device.version }}</h6>
+                                                    <p class="card-text">{{ device.description }}</p>
+                                                    <div class="device-counter">
+                                                        <button type="button" class="btn btn-sm btn-secondary" 
+                                                                onclick="decrementCount({{ device.id }})">-</button>
+                                                        <input type="number" class="form-control form-control-sm device-count" 
+                                                               id="count_{{ device.id }}" name="device_count_{{ device.id }}" 
+                                                               value="0" min="0" style="width: 60px; display: inline-block;">
+                                                        <button type="button" class="btn btn-sm btn-secondary" 
+                                                                onclick="incrementCount({{ device.id }})">+</button>
+                                                    </div>
+                                                </div>
+                                                <div class="card-footer">
+                                                    <small class="text-muted">Image: {{ device.image }}</small>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-primary" onclick="addSelectedDevices()">Add Selected</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body">
                     {% for container in deployment.containers.all %}
@@ -134,6 +174,79 @@
 </div>
 
 <script>
+// Modal functions
+function openDeviceModal() {
+    const modal = new bootstrap.Modal(document.getElementById('deviceModal'));
+    modal.show();
+}
+
+function incrementCount(deviceId) {
+    const input = document.getElementById(`count_${deviceId}`);
+    input.value = parseInt(input.value) + 1;
+}
+
+function decrementCount(deviceId) {
+    const input = document.getElementById(`count_${deviceId}`);
+    const currentValue = parseInt(input.value);
+    if (currentValue > 0) {
+        input.value = currentValue - 1;
+    }
+}
+
+function filterDevices() {
+    const searchText = document.getElementById('deviceSearch').value.toLowerCase();
+    const deviceCards = document.querySelectorAll('.device-card');
+    
+    deviceCards.forEach(card => {
+        const deviceName = card.getAttribute('data-device-name');
+        if (deviceName.includes(searchText)) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+async function addSelectedDevices() {
+    const deviceCounts = {};
+    const countInputs = document.querySelectorAll('.device-count');
+    let hasSelection = false;
+    
+    countInputs.forEach(input => {
+        const count = parseInt(input.value);
+        if (count > 0) {
+            const deviceId = input.id.replace('count_', '');
+            deviceCounts[deviceId] = count;
+            hasSelection = true;
+        }
+    });
+    
+    if (!hasSelection) {
+        showAlert('warning', 'Please select at least one device');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/deployment/${deploymentId}/add-containers/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken,
+            },
+            body: JSON.stringify({ device_counts: deviceCounts })
+        });
+        
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            const data = await response.json();
+            throw new Error(data.message || 'Failed to add devices');
+        }
+    } catch (error) {
+        showAlert('error', error.message);
+    }
+}
+
 function addContainer() {
     const deviceSelect = document.getElementById('device-template');
     const deviceId = deviceSelect.value;
