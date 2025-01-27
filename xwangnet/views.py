@@ -141,11 +141,23 @@ def device_selection(request):
     if request.method == 'POST':
         form = ComposeGeneratorForm(request.POST)
         if form.is_valid():
-            selected_devices = form.cleaned_data['devices']
-            request.session['selected_devices'] = [device.id for device in selected_devices]
+            device_counts = form.cleaned_data['device_counts']
+            selected_devices = []
+            
+            for device_id, count in device_counts.items():
+                device = DeviceTemplate.objects.get(id=device_id)
+                for i in range(count):
+                    selected_devices.append({
+                        'id': device.id,
+                        'name': f"{device.name}-{i+1}",
+                        'original_name': device.name
+                    })
+            
+            request.session['selected_devices'] = selected_devices
             return redirect('network_config')
     else:
         form = ComposeGeneratorForm()
+    
     return render(request, 'device_selection.html', {'form': form})
 
 def network_config(request):
@@ -161,7 +173,7 @@ def network_config(request):
 
 def compose_preview(request):
     network = NetworkConfiguration.objects.get(id=request.session['network_id'])
-    devices = DeviceTemplate.objects.filter(id__in=request.session['selected_devices'])
+    selected_devices = request.session['selected_devices']
     
     compose_data = {
         'version': '3.9',
@@ -176,11 +188,22 @@ def compose_preview(request):
         'services': {}
     }
     
-    for device in devices:
-        compose_data['services'][device.name] = {
+    # Get all unique device templates first
+    device_ids = [device['id'] for device in selected_devices]
+    devices = DeviceTemplate.objects.filter(id__in=device_ids)
+    device_map = {device.id: device for device in devices}
+    
+    # Create services for each selected device instance
+    for device_info in selected_devices:
+        device = device_map[device_info['id']]
+        service_name = device_info['name']
+        
+        compose_data['services'][service_name] = {
             'image': device.image,
             'networks': [network.name],
-            'hostname': f"{device.name}-{network.name}"
+            'hostname': service_name,
+            'ports': device.ports,
+            'environment': device.environment
         }
     
     yaml_content = yaml.dump(compose_data, default_flow_style=False)
@@ -205,7 +228,7 @@ def deploy_compose(request):
                 }, status=400)
             
             network = NetworkConfiguration.objects.get(id=request.session['network_id'])
-            devices = DeviceTemplate.objects.filter(id__in=request.session['selected_devices'])
+            selected_devices = request.session['selected_devices']
             
             # Create deployment record
             deployment = Deployment.objects.create(
@@ -215,12 +238,18 @@ def deploy_compose(request):
                 network_status='down'
             )
             
-            # Create container records
-            for device in devices:
+            # Get all device templates
+            device_ids = [device['id'] for device in selected_devices]
+            devices = DeviceTemplate.objects.filter(id__in=device_ids)
+            device_map = {device.id: device for device in devices}
+            
+            # Create container records for each instance
+            for device_info in selected_devices:
+                device = device_map[device_info['id']]
                 DeployedContainer.objects.create(
                     deployment=deployment,
                     device=device,
-                    hostname=f"{device.name}-{network.name}",
+                    hostname=device_info['name'],
                     status='stopped'
                 )
             

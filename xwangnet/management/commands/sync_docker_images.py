@@ -11,14 +11,16 @@ class Command(BaseCommand):
         
         for image in images:
             for tag in image.tags:
-                name = tag.split(':')[0].split('/')[-1]
-                version = tag.split(':')[1] if ':' in tag else 'latest'
+                # Keep the full image path to prevent duplicates
+                name_parts = tag.split(':')
+                full_name = name_parts[0]
+                version = name_parts[1] if len(name_parts) > 1 else 'latest'
                 
                 device, created = DeviceTemplate.objects.get_or_create(
-                    name=name,
-                    version=version,
+                    image=tag,  # Use full image tag as unique identifier
                     defaults={
-                        'image': tag,
+                        'name': full_name.split('/')[-1],  # Still use short name for display
+                        'version': version,
                         'docker_id': image.id,
                         'docker_tags': image.tags,
                         'description': f'Automatically discovered Docker image: {tag}'
@@ -32,5 +34,5 @@ class Command(BaseCommand):
                 
                 status = 'Created' if created else 'Updated'
                 self.stdout.write(
-                    self.style.SUCCESS(f'{status} device template: {device.name} {device.version}')
+                    self.style.SUCCESS(f'{status} device template: {device.name} {device.version} ({tag})')
                 )

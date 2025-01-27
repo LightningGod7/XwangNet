@@ -22,7 +22,27 @@ class DeviceInstanceForm(forms.ModelForm):
         fields = ['template', 'hostname', 'exposed_ports', 'environment_vars']
 
 class ComposeGeneratorForm(forms.Form):
-    devices = forms.ModelMultipleChoiceField(
-        queryset=DeviceTemplate.objects.all(),
-        widget=forms.CheckboxSelectMultiple
-    )
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['devices'] = forms.ModelMultipleChoiceField(
+            queryset=DeviceTemplate.objects.all(),
+            widget=forms.CheckboxSelectMultiple,
+            required=False
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        device_counts = {}
+        
+        for key, value in self.data.items():
+            if key.startswith('device_count_'):
+                device_id = int(key.replace('device_count_', ''))
+                count = int(value)
+                if count > 0:
+                    device_counts[device_id] = count
+        
+        if not device_counts:
+            raise forms.ValidationError("Please select at least one device")
+        
+        cleaned_data['device_counts'] = device_counts
+        return cleaned_data
