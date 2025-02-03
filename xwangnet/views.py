@@ -306,6 +306,11 @@ def deployment_list(request):
 
 def deployment_detail(request, deployment_id):
     deployment = get_object_or_404(Deployment, id=deployment_id)
+    
+    if request.method == 'DELETE':
+        deployment.delete()
+        return JsonResponse({'status': 'success', 'message': 'Deployment deleted successfully'})
+    
     return render(request, 'deployment_detail.html', {
         'deployment': deployment,
         'deployments': Deployment.objects.all().order_by('-created_at'),
