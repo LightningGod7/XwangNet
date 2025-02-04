@@ -13,48 +13,18 @@ For more information please follow [Docker Installation](https://docs.docker.com
 ## Installing Dependencies
 
 ```shell
-sudo apt install pipx
-pipx install poetry
-pipx ensurepath
+sudo apt install python3-pip
+sudo apt install python3-virtualenv
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
-
-Restart terminal
 
 ## Getting Started
 ```shell
-poetry install
-poetry run python manage.py makemigrations
-poetry run python manage.py migrate
-poetry run python manage.py createsuperuser
-poetry run python manage.py sync_docker_images
-python manage.py runserver
-```
-
-### Development
-
-To run any python code in poetry environment
-
-```shell
-poetry run python 
-```
-#### Updating add depedencies
-
-```shell
-poetry update
-```
-
-#### Adding python dependencies
-
-```shell
-poetry add <package>
-```
-
-####  Removing python dependencies
-```shell
-poetry remove <package>
-```
-
-#### Checking dependencies
-```shell
-poetry show
+python3 manage.py makemigrations
+python3 manage.py migrate
+python3 manage.py createsuperuser
+python3 manage.py sync_docker_images
+python3 manage.py runserver
 ```
