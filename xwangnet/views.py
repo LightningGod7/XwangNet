@@ -559,7 +559,7 @@ def add_deployed_container(request, deployment_id):
             device = DeviceTemplate.objects.get(id=device_id)
             
             # Generate unique hostname
-            base_hostname = f"{device.name}-{deployment.name}"
+            base_hostname = f"{device.name}-{device.version}"
             existing_count = DeployedContainer.objects.filter(
                 deployment=deployment,
                 hostname__startswith=base_hostname
