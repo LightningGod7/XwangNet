@@ -14,7 +14,7 @@ class DockerContainerForm(forms.ModelForm):
 class NetworkConfigurationForm(forms.ModelForm):
     class Meta:
         model = NetworkConfiguration
-        fields = ['name', 'network_type', 'subnet', 'gateway']
+        fields = ['name', 'network_type']
 
 class DeviceInstanceForm(forms.ModelForm):
     class Meta:

@@ -736,7 +736,7 @@ def network_action(request, network_id):
                 network = client.networks.create(
                     name=db_network.name,
                     driver=db_network.network_type,
-                    ipam=docker.types.IPAMConfig(
+                    # ipam=docker.types.IPAMConfig(
                         pool_configs=[
                             docker.types.IPAMPool(
                                 subnet=db_network.subnet,
@@ -744,7 +744,7 @@ def network_action(request, network_id):
                             )
                         ]
                     )
-                )
+                
                 return JsonResponse({'status': 'success', 'message': f'Network {db_network.name} created'})
             
             elif action == 'delete':
