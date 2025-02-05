@@ -7,6 +7,10 @@ import yaml
 from django.http import JsonResponse, HttpResponse
 import json
 from django.template.loader import render_to_string
+from django.core.files.storage import FileSystemStorage
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+import re
 from concurrent.futures import ThreadPoolExecutor
 
 client = docker.from_env()
@@ -285,13 +289,13 @@ def add_containers_to_deployment(request, deployment_id):
                 device = DeviceTemplate.objects.get(id=device_id)
                 for i in range(count):
                     # Generate unique hostname
-                    base_hostname = f"{device.name}-{deployment.name}"
+                    base_hostname = f"{device.name}-{device.version}"
                     existing_count = DeployedContainer.objects.filter(
                         deployment=deployment,
                         hostname__startswith=base_hostname
                     ).count()
                     hostname = f"{base_hostname}-{existing_count + i + 1}"
-                    
+
                     DeployedContainer.objects.create(
                         deployment=deployment,
                         device=device,
@@ -354,11 +358,15 @@ def toggle_network(request, deployment_id):
                         'message': f'Network "{deployment.network.name}" already exists'
                     }, status=400)
                 
-                # Try to create the network
-                network = client.networks.create(
-                    deployment.network.name,
-                    driver=deployment.network.network_type,
-                    ipam=docker.types.IPAMConfig(
+                # Check if subnet and gateway are provided
+                network_params = {
+                    'name': deployment.network.name,
+                    'driver': deployment.network.network_type,
+                }
+
+                # Only add IPAM config if both subnet and gateway are provided
+                if deployment.network.subnet and deployment.network.gateway:
+                    network_params['ipam'] = docker.types.IPAMConfig(
                         pool_configs=[
                             docker.types.IPAMPool(
                                 subnet=deployment.network.subnet,
@@ -366,7 +374,9 @@ def toggle_network(request, deployment_id):
                             )
                         ]
                     )
-                )
+                
+                # Try to create the network with or without IPAM config
+                network = client.networks.create(**network_params)
                 deployment.docker_network_id = network.id
                 deployment.network_status = 'up'
                 deployment.save()
@@ -676,27 +686,35 @@ def network_action(request, network_id):
     """Handle network actions (start/stop/delete)"""
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
-    
-    action = request.POST.get('action')
-    
+  
     try:
+        data = json.loads(request.body)
+        action = data.get('action')
+        
         if network_id.startswith('planned_'):
             # Handle planned network actions
             db_network = get_object_or_404(NetworkConfiguration, id=network_id.replace('planned_', ''))
             
             if action == 'start':
-                # Create the network in Docker
+                # Create the network in Docker with optional subnet/gateway
+                ipam_config = {}
+                subnet = data.get('subnet')
+                gateway = data.get('gateway')
+                
+                if subnet or gateway:
+                    ipam_pool = {}
+                    if subnet:
+                        ipam_pool['subnet'] = subnet
+                    if gateway:
+                        ipam_pool['gateway'] = gateway
+                    ipam_config = docker.types.IPAMConfig(
+                        pool_configs=[docker.types.IPAMPool(**ipam_pool)]
+                    )
+                
                 network = client.networks.create(
                     name=db_network.name,
                     driver=db_network.network_type,
-                    ipam=docker.types.IPAMConfig(
-                        pool_configs=[
-                            docker.types.IPAMPool(
-                                subnet=db_network.subnet,
-                                gateway=db_network.gateway
-                            )
-                        ]
-                    )
+                    ipam=ipam_config if ipam_config else None
                 )
                 return JsonResponse({'status': 'success', 'message': f'Network {db_network.name} created'})
             
@@ -713,7 +731,10 @@ def network_action(request, network_id):
                 return JsonResponse({'status': 'success', 'message': f'Network {network.name} removed'})
             
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
 
 def is_subnet_overlap(subnet1, subnet2):
     """Helper function to check if two subnets overlap"""
@@ -724,3 +745,33 @@ def is_subnet_overlap(subnet1, subnet2):
         return net1.overlaps(net2)
     except ValueError:
         return False
+
+def upload_firmware(request):
+    if request.method == 'POST':
+        firmware_name = request.POST['firmware_name']
+        firmware_description = request.POST['firmware_description']
+        contact_name = request.POST['contact_name']
+        contact_email = request.POST['contact_email']
+        contact_phone = request.POST['contact_phone']
+        firmware_file = request.FILES['firmware_file']
+
+        # Validate email
+        try:
+            validate_email(contact_email)
+        except ValidationError:
+            return HttpResponse('Invalid email address', status=400)
+
+        # Validate phone number
+        phone_pattern = re.compile(r'^\+[1-9]\d{1,14}$')
+        if not phone_pattern.match(contact_phone):
+            return HttpResponse('Invalid phone number', status=400)
+
+        # Save the file
+        fs = FileSystemStorage(location='FirmwareUploads/')
+        filename = fs.save(firmware_file.name, firmware_file)
+        uploaded_file_url = fs.url(filename)
+
+        return render(request, 'upload_firmware.html', {
+            'uploaded_file_url': uploaded_file_url
+        })
+    return render(request, 'upload_firmware.html')
