@@ -229,7 +229,7 @@ def deploy_compose(request):
             
             # Get all device templates
             device_ids = [device['id'] for device in selected_devices]
-            devices = DeviceTemplate.objects.filter(id__in(device_ids))
+            devices = DeviceTemplate.objects.filter(id__in=device_ids)
             device_map = {device.id: device for device in devices}
             
             # Create container records for each instance
