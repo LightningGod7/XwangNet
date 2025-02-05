@@ -342,7 +342,6 @@ def toggle_network(request, deployment_id):
     deployment = get_object_or_404(Deployment, id=deployment_id)
     data = json.loads(request.body)
     action = data.get('action')
-    # client = docker.from_env()
     
     try:
         if action == 'up' and deployment.network_status == 'down':
@@ -468,7 +467,6 @@ def container_action(request, container_id):
 
 def container_logs(request, container_id):
     container = get_object_or_404(DeployedContainer, id=container_id)
-    # client = docker.from_env()
     
     try:
         if container.container_id and container.status == 'running':
@@ -496,7 +494,7 @@ def container_buttons(request, container_id):
 def remove_container(request, container_id):
     if request.method == 'POST':
         try:
-            # client = docker.from_env()
+    
             container = client.containers.get(container_id)
             
             # Only allow removing stopped containers
@@ -578,7 +576,6 @@ def add_deployed_container(request, deployment_id):
 
 def networks(request):
     """View for managing Docker networks and their configurations"""
-    # client = docker.from_env()
     
     # Get all networks from Docker and database
     docker_networks = client.networks.list()
@@ -681,7 +678,6 @@ def network_action(request, network_id):
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
     
     action = request.POST.get('action')
-    # client = docker.from_env()
     
     try:
         if network_id.startswith('planned_'):
