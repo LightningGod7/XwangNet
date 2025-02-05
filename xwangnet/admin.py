@@ -1,10 +1,17 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import path, reverse
-from django.shortcuts import redirect
+from django.shortcuts import redirect, render
 from django.contrib import messages
 import docker
 from .models import DeviceTemplate, NetworkConfiguration, DeviceInstance, Deployment, DeployedContainer
+
+import docker
+from django.urls import path
+from django.shortcuts import render, redirect
+from django.contrib import admin, messages
+from django.utils.html import format_html
+from .models import DeviceTemplate  # Adjust this import based on your project structure
 
 @admin.register(DeviceTemplate)
 class DeviceTemplateAdmin(admin.ModelAdmin):
@@ -12,8 +19,8 @@ class DeviceTemplateAdmin(admin.ModelAdmin):
     search_fields = ('name', 'image', 'version', 'description')
     list_filter = ('created_at', 'version')
     readonly_fields = ('docker_id', 'docker_tags')
-    actions = ['sync_with_docker_action']  # List of admin actions
-    
+    actions = ['sync_with_docker_action']
+
     fieldsets = (
         ('Basic Information', {
             'fields': ('name', 'version', 'description')
@@ -33,7 +40,7 @@ class DeviceTemplateAdmin(admin.ModelAdmin):
         return format_html('<span style="color: red;">✗ Not Found</span>')
     docker_status.short_description = 'Docker Status'
 
-    def custom_actions(self, obj):  # Renamed from 'actions' to 'custom_actions'
+    def custom_actions(self, obj):
         return format_html(
             '<a class="button" href="{}">Pull Image</a> '
             '<a class="button" href="{}">Build Image</a>',
@@ -43,7 +50,6 @@ class DeviceTemplateAdmin(admin.ModelAdmin):
     custom_actions.short_description = 'Actions'
 
     def sync_with_docker_action(self, request, queryset):
-        """Admin action to sync selected devices with Docker"""
         for device in queryset:
             if device.sync_with_docker():
                 messages.success(request, f'Successfully synced {device.name} {device.version}')
@@ -51,19 +57,83 @@ class DeviceTemplateAdmin(admin.ModelAdmin):
                 messages.error(request, f'Failed to sync {device.name} {device.version}')
     sync_with_docker_action.short_description = "Sync selected devices with Docker"
 
+    def changelist_view(self, request, extra_context=None):
+        """Customize the changelist view to add a 'List Docker Images' button."""
+        extra_context = extra_context or {}
+        extra_context['list_docker_images_url'] = '/admin/xwangnet/devicetemplate/list-docker-images/'
+        return super().changelist_view(request, extra_context=extra_context)
+
     def get_urls(self):
         urls = super().get_urls()
         custom_urls = [
-            path('pull-image/<int:device_id>/', 
-                 self.admin_site.admin_view(self.pull_image),
-                 name='pull-image'),
-            path('build-image/<int:device_id>/',
-                 self.admin_site.admin_view(self.build_image),
-                 name='build-image'),
+            path('list-docker-images/', self.admin_site.admin_view(self.list_docker_images), name='list-docker-images'),
+            path('add-image/<str:image_id>/', self.admin_site.admin_view(self.add_image), name='add-image'),
+            path('pull-image/<int:device_id>/', self.admin_site.admin_view(self.pull_image), name='pull-image'),
+            path('build-image/<int:device_id>/', self.admin_site.admin_view(self.build_image), name='build-image'),
         ]
         return custom_urls + urls
 
+    def list_docker_images(self, request):
+        """View available Docker images and allow admin to add them."""
+        client = docker.from_env()
+        images = client.images.list()
+        
+        image_data = []
+        for image in images:
+            for tag in image.tags:
+                name_parts = tag.split(':')
+                full_name = name_parts[0]
+                version = name_parts[1] if len(name_parts) > 1 else 'latest'
+                
+                image_data.append({
+                    'tag': tag,
+                    'name': full_name.split('/')[-1],  # Display short name
+                    'version': version,
+                    'docker_id': image.id,
+                    'docker_tags': image.tags,
+                })
+
+        context = {
+            'title': 'Available Docker Images',
+            'images': image_data,
+        }
+        return render(request, 'admin/xwangnet/devicetemplate/list_docker_images.html', context)
+
+    def add_image(self, request, image_id):
+        """Add a selected Docker image to the DeviceTemplate model."""
+        client = docker.from_env()
+        images = client.images.list()
+        
+        for image in images:
+            if image_id in image.id:
+                for tag in image.tags:
+                    name_parts = tag.split(':')
+                    full_name = name_parts[0]
+                    version = name_parts[1] if len(name_parts) > 1 else 'latest'
+
+                    device, created = DeviceTemplate.objects.get_or_create(
+                        image=tag,
+                        defaults={
+                            'name': full_name.split('/')[-1],
+                            'version': version,
+                            'docker_id': image.id,
+                            'docker_tags': image.tags,
+                            'description': f'Automatically discovered Docker image: {tag}',
+                        }
+                    )
+
+                    if not created:
+                        device.docker_id = image.id
+                        device.docker_tags = image.tags
+                        device.save()
+
+                    status = 'Created' if created else 'Updated'
+                    messages.success(request, f'{status} device template: {device.name} {device.version} ({tag})')
+
+        return redirect('admin:xwangnet_devicetemplate_changelist')
+
     def pull_image(self, request, device_id):
+        """Pull a Docker image for a selected device"""
         device = DeviceTemplate.objects.get(id=device_id)
         try:
             client = docker.from_env()
@@ -75,10 +145,11 @@ class DeviceTemplateAdmin(admin.ModelAdmin):
         return redirect('admin:xwangnet_devicetemplate_changelist')
 
     def build_image(self, request, device_id):
+        """Build a Docker image for a selected device"""
         device = DeviceTemplate.objects.get(id=device_id)
         try:
-            # Add your build logic here
             messages.info(request, f'Building image: {device.image}')
+            # Add your build logic here
         except Exception as e:
             messages.error(request, f'Error building image: {str(e)}')
         return redirect('admin:xwangnet_devicetemplate_changelist')

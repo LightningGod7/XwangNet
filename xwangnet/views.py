@@ -686,7 +686,7 @@ def network_action(request, network_id):
     """Handle network actions (start/stop/delete)"""
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
-    
+  
     try:
         data = json.loads(request.body)
         action = data.get('action')
