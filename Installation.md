@@ -13,7 +13,7 @@ For more information please follow [Docker Installation](https://docs.docker.com
 ## Installing Dependencies
 
 ```shell
-sudo apt install python3-pi
+sudo apt install python3-pip
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
