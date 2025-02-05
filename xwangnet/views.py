@@ -677,26 +677,34 @@ def network_action(request, network_id):
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
     
-    action = request.POST.get('action')
-    
     try:
+        data = json.loads(request.body)
+        action = data.get('action')
+        
         if network_id.startswith('planned_'):
             # Handle planned network actions
             db_network = get_object_or_404(NetworkConfiguration, id=network_id.replace('planned_', ''))
             
             if action == 'start':
-                # Create the network in Docker
+                # Create the network in Docker with optional subnet/gateway
+                ipam_config = {}
+                subnet = data.get('subnet')
+                gateway = data.get('gateway')
+                
+                if subnet or gateway:
+                    ipam_pool = {}
+                    if subnet:
+                        ipam_pool['subnet'] = subnet
+                    if gateway:
+                        ipam_pool['gateway'] = gateway
+                    ipam_config = docker.types.IPAMConfig(
+                        pool_configs=[docker.types.IPAMPool(**ipam_pool)]
+                    )
+                
                 network = client.networks.create(
                     name=db_network.name,
                     driver=db_network.network_type,
-                    ipam=docker.types.IPAMConfig(
-                        pool_configs=[
-                            docker.types.IPAMPool(
-                                subnet=db_network.subnet,
-                                gateway=db_network.gateway
-                            )
-                        ]
-                    )
+                    ipam=ipam_config if ipam_config else None
                 )
                 return JsonResponse({'status': 'success', 'message': f'Network {db_network.name} created'})
             
@@ -713,7 +721,10 @@ def network_action(request, network_id):
                 return JsonResponse({'status': 'success', 'message': f'Network {network.name} removed'})
             
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
 
 def is_subnet_overlap(subnet1, subnet2):
     """Helper function to check if two subnets overlap"""
