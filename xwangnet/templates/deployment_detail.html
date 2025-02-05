@@ -124,7 +124,7 @@
                 <div class="card-body">
                     {% for container in deployment.containers.all %}
                     <div class="container-item mb-4" id="container-{{ container.id }}">
-                        <h5>{{ container.device.name }} ({{ container.hostname }})</h5>
+                        <h5>{{ container.hostname }}</h5>
                         <p>Status: <span class="container-status badge bg-{{ container.status|yesno:'success,danger' }}">
                             {{ container.status }}
                         </span></p>

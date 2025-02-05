@@ -177,7 +177,7 @@ def device_selection(request):
                 for i in range(count):
                     selected_devices.append({
                         'id': device.id,
-                        'name': f"{device.name}-{i+1}",
+                        'name': f"{device.name}-{device.version}-{i+1}",
                         'original_name': device.name
                     })
             
