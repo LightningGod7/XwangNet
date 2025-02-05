@@ -1,0 +1,28 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+    <h2>Available Docker Images</h2>
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Version</th>
+                <th>Image Tag</th>
+                <th>Docker ID</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for image in images %}
+                <tr>
+                    <td>{{ image.name }}</td>
+                    <td>{{ image.version }}</td>
+                    <td>{{ image.tag }}</td>
+                    <td>{{ image.docker_id }}</td>
+                    <td>
+                        <a href="{% url 'admin:add-image' image.docker_id %}" class="button">Add to DB</a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}
