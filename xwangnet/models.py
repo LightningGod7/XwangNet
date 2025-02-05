@@ -57,8 +57,8 @@ class NetworkConfiguration(models.Model):
     ]
     
     network_type = models.CharField(max_length=10, choices=NETWORK_TYPES)
-    subnet = models.CharField(max_length=255)
-    gateway = models.CharField(max_length=255)
+    subnet = models.CharField(max_length=255, blank=True)
+    gateway = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=False)
 

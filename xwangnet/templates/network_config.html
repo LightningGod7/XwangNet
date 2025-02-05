@@ -45,15 +45,14 @@
                     <div class="form-text">Bridge networks are isolated, Host-only networks can't access external networks</div>
                 </div>
 
-                <!-- <div class="mb-3">
-                    <label for="id_subnet" class="form-label">Subnet</label>
+                <div class="mb-3">
+                    <label for="id_subnet" class="form-label">Subnet (Optional)</label>
                     <input type="text" 
                            class="form-control {% if form.subnet.errors %}is-invalid{% endif %}" 
                            id="id_subnet" 
                            name="subnet" 
-                           value="{{ form.subnet.value|default:'172.16.0.0/16' }}"
-                           placeholder="e.g., 172.16.0.0/16"
-                           required>
+                           value="{{ form.subnet.value|default:'' }}"
+                           placeholder="e.g., 172.16.0.0/16">
                     {% if form.subnet.errors %}
                         <div class="invalid-feedback">
                             {{ form.subnet.errors|join:", " }}
@@ -63,14 +62,13 @@
                 </div>
 
                 <div class="mb-3">
-                    <label for="id_gateway" class="form-label">Gateway</label>
+                    <label for="id_gateway" class="form-label">Gateway (Optional)</label>
                     <input type="text" 
                            class="form-control {% if form.gateway.errors %}is-invalid{% endif %}" 
                            id="id_gateway" 
                            name="gateway" 
-                           value="{{ form.gateway.value|default:'172.16.0.1' }}"
-                           placeholder="e.g., 172.16.0.1"
-                           required>
+                           value="{{ form.gateway.value|default:'' }}"
+                           placeholder="e.g., 172.16.0.1">
                     {% if form.gateway.errors %}
                         <div class="invalid-feedback">
                             {{ form.gateway.errors|join:", " }}
@@ -92,11 +90,12 @@
 
 {% block extra_js %}
 <script>
-    // Form validation
     (function () {
         'use strict'
         
         const forms = document.querySelectorAll('.needs-validation')
+        const subnetInput = document.getElementById('id_subnet')
+        const gatewayInput = document.getElementById('id_gateway')
         
         Array.prototype.slice.call(forms).forEach(function (form) {
             form.addEventListener('submit', function (event) {
@@ -104,27 +103,46 @@
                     event.preventDefault()
                     event.stopPropagation()
                 }
+                
+                // Remove any previous validation classes
+                subnetInput.classList.remove('is-invalid')
+                gatewayInput.classList.remove('is-invalid')
+                
+                // Custom validation: if one is filled, both must be filled
+                if ((subnetInput.value && !gatewayInput.value) || 
+                    (!subnetInput.value && gatewayInput.value)) {
+                    if (subnetInput.value && !gatewayInput.value) {
+                        gatewayInput.classList.add('is-invalid')
+                        gatewayInput.nextElementSibling.textContent = 'Gateway is required when subnet is specified'
+                    } else {
+                        subnetInput.classList.add('is-invalid')
+                        subnetInput.nextElementSibling.textContent = 'Subnet is required when gateway is specified'
+                    }
+                    event.preventDefault()
+                    event.stopPropagation()
+                }
+                
                 form.classList.add('was-validated')
             }, false)
         })
 
         // Auto-populate gateway based on subnet
-        // const subnetInput = document.getElementById('id_subnet')
-        // const gatewayInput = document.getElementById('id_gateway')
+        const subnetInput = document.getElementById('id_subnet')
+        const gatewayInput = document.getElementById('id_gateway')
 
-        // subnetInput.addEventListener('change', function() {
-        //     try {
-        //         const subnet = this.value
-        //         if (subnet.includes('/')) {
-        //             const baseIP = subnet.split('/')[0]
-        //             const parts = baseIP.split('.')
-        //             parts[3] = '1'
-        //             gatewayInput.value = parts.join('.')
-        //         }
-        //     } catch (e) {
-        //         console.error('Error auto-populating gateway:', e)
-        //     }
-        // })
+        subnetInput.addEventListener('change', function() {
+            try {
+                const subnet = this.value
+                if (subnet.includes('/')) {
+                    const baseIP = subnet.split('/')[0]
+                    const parts = baseIP.split('.')
+                    parts[3] = '1'
+                    gatewayInput.value = parts.join('.')
+                }
+            } catch (e) {
+                console.error('Error auto-populating gateway:', e)
+            }
+        })
 
         // Network type help tooltip
         const networkTypeSelect = document.getElementById('id_network_type')
