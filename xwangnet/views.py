@@ -7,6 +7,7 @@ import yaml
 from django.http import JsonResponse, HttpResponse
 import json
 from django.template.loader import render_to_string
+from concurrent.futures import ThreadPoolExecutor
 
 client = docker.from_env()
 
@@ -35,135 +36,91 @@ def container_list(request):
         'initial_load': True
     })
 
-def container_list_api(request):
-    # client = docker.from_env()
-    deployments = Deployment.objects.all().prefetch_related('containers')
-    result = {}
-    
+def get_container_stats(container):
     try:
-        docker_containers = client.containers.list(all=True)
-        container_map = {c.id: c for c in docker_containers}
-        
-        for deployment in deployments:
-            containers_data = []
-            for deployed_container in deployment.containers.all():
-                try:
-                    if deployed_container.container_id in container_map:
-                        container = container_map[deployed_container.container_id]
-                        
-                        # Initialize stats
-                        stats = {
-                            'cpu_usage': 0,
-                            'mem_usage': 0,
-                            'mem_limit': 0,
-                            'mem_percent': 0
-                        }
-                        
-                        if container.status == 'running':
-                            try:
-                                container_stats = container.stats(stream=False)
-                                
-                                # Calculate CPU usage with fallback options
-                                try:
-                                    cpu_delta = container_stats['cpu_stats']['cpu_usage']['total_usage'] - \
-                                              container_stats['precpu_stats']['cpu_usage']['total_usage']
-                                    system_delta = container_stats['cpu_stats']['system_cpu_usage'] - \
-                                                 container_stats['precpu_stats']['system_cpu_usage']
-                                    
-                                    # Get number of CPUs
-                                    if 'online_cpus' in container_stats['cpu_stats']:
-                                        num_cpus = container_stats['cpu_stats']['online_cpus']
-                                    elif 'percpu_usage' in container_stats['cpu_stats']['cpu_usage']:
-                                        num_cpus = len(container_stats['cpu_stats']['cpu_usage']['percpu_usage'])
-                                    else:
-                                        num_cpus = 1
-                                    
-                                    if system_delta > 0:
-                                        cpu_usage = (cpu_delta / system_delta) * 100 * num_cpus
-                                    else:
-                                        cpu_usage = 0
-                                        
-                                except (KeyError, TypeError, ZeroDivisionError) as e:
-                                    print(f"CPU calculation fallback for {deployed_container.hostname}: {str(e)}")
-                                    # Fallback to simpler CPU calculation
-                                    try:
-                                        cpu_usage = (container_stats['cpu_stats']['cpu_usage']['total_usage'] / 
-                                                   container_stats['cpu_stats']['system_cpu_usage']) * 100
-                                    except:
-                                        cpu_usage = 0
-                                
-                                # Calculate memory usage with error handling
-                                try:
-                                    mem_usage = container_stats['memory_stats'].get('usage', 0)
-                                    mem_limit = container_stats['memory_stats'].get('limit', 0)
-                                    mem_percent = (mem_usage / mem_limit) * 100 if mem_limit > 0 else 0
-                                except (KeyError, ZeroDivisionError):
-                                    mem_usage = 0
-                                    mem_limit = 0
-                                    mem_percent = 0
-                                
-                                stats = {
-                                    'cpu_usage': round(max(0, min(cpu_usage, 100)), 2),  # Clamp between 0-100
-                                    'mem_usage': round(mem_usage / (1024 * 1024), 2),
-                                    'mem_limit': round(mem_limit / (1024 * 1024), 2),
-                                    'mem_percent': round(mem_percent, 2)
-                                }
-                                
-                            except Exception as e:
-                                print(f"Error getting stats for container {deployed_container.hostname}: {str(e)}")
+        container_stats = container.stats(stream=False)
+        cpu_usage, mem_usage, mem_limit, mem_percent = 0, 0, 0, 0
 
-                        health_log = container.attrs.get('State', {}).get('Health', {}).get('Log', [])
-                        # Ensure health_log is a list before using list operations
-                        if isinstance(health_log, list):
-                            health_log = health_log[-3:]
-                        else:
-                            health_log = ['No health logs']
-                        
-                        # Get container info
-                        container_info = {
-                            'id': container.short_id,
-                            'name': deployed_container.hostname,
-                            'status': container.status,
-                            'image': container.image.tags[0] if container.image.tags else container.image.short_id,
-                            'created': container.attrs['Created'],
-                            'ports': container.ports,
-                            'network': deployment.network.name if deployment.network else None,
-                            'health_status': container.attrs.get('State', {}).get('Health', {}).get('Status', 'No health check'),
-                            'health_log': health_log,
-                            'device_name': deployed_container.device.name,
-                            **stats
-                        }
-                        containers_data.append(container_info)
-                        
-                except Exception as e:
-                    print(f"Error processing container {deployed_container.hostname}: {str(e)}")
-                    continue
+        # CPU Usage Calculation
+        cpu_delta = container_stats['cpu_stats']['cpu_usage']['total_usage'] - \
+                    container_stats['precpu_stats']['cpu_usage']['total_usage']
+        system_delta = container_stats['cpu_stats']['system_cpu_usage'] - \
+                       container_stats['precpu_stats']['system_cpu_usage']
+        num_cpus = container_stats['cpu_stats'].get('online_cpus', 1)
+
+        if system_delta > 0:
+            cpu_usage = (cpu_delta / system_delta) * 100 * num_cpus
+
+        # Memory Usage Calculation
+        mem_usage = container_stats['memory_stats'].get('usage', 0)
+        mem_limit = container_stats['memory_stats'].get('limit', 1)  # Avoid zero division
+        mem_percent = (mem_usage / mem_limit) * 100
+
+        return {
+            'cpu_usage': round(min(max(cpu_usage, 0), 100), 2),
+            'mem_usage': round(mem_usage / (1024 * 1024), 2),
+            'mem_limit': round(mem_limit / (1024 * 1024), 2),
+            'mem_percent': round(mem_percent, 2)
+        }
+    except Exception:
+        return {'cpu_usage': 0, 'mem_usage': 0, 'mem_limit': 0, 'mem_percent': 0}
+
+def container_list_api(request):
+    deployments = Deployment.objects.prefetch_related('containers')
+    docker_containers = {c.id: c for c in client.containers.list(all=True)}
+
+    result = {}
+    container_stats_map = {}
+
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_container = {executor.submit(get_container_stats, container): container.id 
+                               for container in docker_containers.values()}
+        for future in future_to_container:
+            container_id = future_to_container[future]
+            container_stats_map[container_id] = future.result()
+
+    for deployment in deployments:
+        containers_data = []
+        for deployed_container in deployment.containers.all():
+            container = docker_containers.get(deployed_container.container_id)
+            if not container:
+                continue
+
+            stats = container_stats_map.get(container.id, {'cpu_usage': 0, 'mem_usage': 0, 'mem_limit': 0, 'mem_percent': 0})
             
-            if containers_data:
-                result[deployment.id] = {
-                    'name': deployment.name,
-                    'network_status': deployment.network_status,
-                    'containers': containers_data
-                }
-        
-        running_count = sum(1 for containers in result.values() 
-                          for c in containers['containers'] if c['status'] == 'running')
-        total_count = sum(len(containers['containers']) for containers in result.values())
-        
-        return JsonResponse({
-            'status': 'success',
-            'data': {
-                'deployments': result,
-                'running_count': running_count,
-                'total_count': total_count
+            container_info = {
+                'id': container.short_id,
+                'name': deployed_container.hostname,
+                'status': container.status,
+                'image': container.image.tags[0] if container.image.tags else container.image.short_id,
+                'created': container.attrs['Created'],
+                'ports': container.ports,
+                'network': deployment.network.name if deployment.network else None,
+                'health_status': container.attrs.get('State', {}).get('Health', {}).get('Status', 'No health check'),
+                'health_log': container.attrs.get('State', {}).get('Health', {}).get('Log', [])[-3:] if isinstance(container.attrs.get('State', {}).get('Health', {}).get('Log', []), list) else ['No health logs'],
+                'device_name': deployed_container.device.name,
+                **stats
             }
-        })
-        
-    except Exception as e:
-        return JsonResponse({
-            'status': 'error',
-            'message': str(e)
-        }, status=500)
+            containers_data.append(container_info)
+
+        if containers_data:
+            result[deployment.id] = {
+                'name': deployment.name,
+                'network_status': deployment.network_status,
+                'containers': containers_data
+            }
+
+    running_count = sum(1 for deployment in result.values() for c in deployment['containers'] if c['status'] == 'running')
+    total_count = sum(len(deployment['containers']) for deployment in result.values())
+
+    return JsonResponse({
+        'status': 'success',
+        'data': {
+            'deployments': result,
+            'running_count': running_count,
+            'total_count': total_count
+        }
+    })
 
 def device_selection(request):
     if request.method == 'POST':
@@ -385,7 +342,6 @@ def toggle_network(request, deployment_id):
     deployment = get_object_or_404(Deployment, id=deployment_id)
     data = json.loads(request.body)
     action = data.get('action')
-    # client = docker.from_env()
     
     try:
         if action == 'up' and deployment.network_status == 'down':
@@ -511,7 +467,6 @@ def container_action(request, container_id):
 
 def container_logs(request, container_id):
     container = get_object_or_404(DeployedContainer, id=container_id)
-    # client = docker.from_env()
     
     try:
         if container.container_id and container.status == 'running':
@@ -539,7 +494,7 @@ def container_buttons(request, container_id):
 def remove_container(request, container_id):
     if request.method == 'POST':
         try:
-            # client = docker.from_env()
+    
             container = client.containers.get(container_id)
             
             # Only allow removing stopped containers
@@ -621,7 +576,6 @@ def add_deployed_container(request, deployment_id):
 
 def networks(request):
     """View for managing Docker networks and their configurations"""
-    # client = docker.from_env()
     
     # Get all networks from Docker and database
     docker_networks = client.networks.list()
@@ -724,7 +678,6 @@ def network_action(request, network_id):
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
     
     action = request.POST.get('action')
-    # client = docker.from_env()
     
     try:
         if network_id.startswith('planned_'):
