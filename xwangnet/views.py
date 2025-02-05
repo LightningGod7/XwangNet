@@ -358,11 +358,15 @@ def toggle_network(request, deployment_id):
                         'message': f'Network "{deployment.network.name}" already exists'
                     }, status=400)
                 
-                # Try to create the network
-                network = client.networks.create(
-                    deployment.network.name,
-                    driver=deployment.network.network_type,
-                    ipam=docker.types.IPAMConfig(
+                # Check if subnet and gateway are provided
+                network_params = {
+                    'name': deployment.network.name,
+                    'driver': deployment.network.network_type,
+                }
+
+                # Only add IPAM config if both subnet and gateway are provided
+                if deployment.network.subnet and deployment.network.gateway:
+                    network_params['ipam'] = docker.types.IPAMConfig(
                         pool_configs=[
                             docker.types.IPAMPool(
                                 subnet=deployment.network.subnet,
@@ -370,7 +374,9 @@ def toggle_network(request, deployment_id):
                             )
                         ]
                     )
-                )
+                
+                # Try to create the network with or without IPAM config
+                network = client.networks.create(**network_params)
                 deployment.docker_network_id = network.id
                 deployment.network_status = 'up'
                 deployment.save()
