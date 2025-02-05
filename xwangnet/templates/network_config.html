@@ -75,7 +75,7 @@
                         </div>
                     {% endif %}
                     <div class="form-text">Specify the gateway IP address</div>
-                </div> -->
+                </div>
 
                 <div class="d-flex justify-content-between">
                     <a href="{% url 'device_selection' %}" class="btn btn-secondary">Back to Device Selection</a>
@@ -127,9 +127,6 @@
         })
 
         // Auto-populate gateway based on subnet
-        const subnetInput = document.getElementById('id_subnet')
-        const gatewayInput = document.getElementById('id_gateway')
-
         subnetInput.addEventListener('change', function() {
             try {
                 const subnet = this.value
