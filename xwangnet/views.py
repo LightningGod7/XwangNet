@@ -294,7 +294,7 @@ def add_containers_to_deployment(request, deployment_id):
                         deployment=deployment,
                         hostname__startswith=base_hostname
                     ).count()
-                    hostname = f"{base_hostname}-{existing_count + i + 1}"
+                    hostname = f"{base_hostname}-{existing_count + 1}"
 
                     DeployedContainer.objects.create(
                         deployment=deployment,
