@@ -14,7 +14,6 @@ For more information please follow [Docker Installation](https://docs.docker.com
 
 ```shell
 sudo apt install python3-pip
-sudo apt install python3-virtualenv
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
