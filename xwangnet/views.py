@@ -7,6 +7,10 @@ import yaml
 from django.http import JsonResponse, HttpResponse
 import json
 from django.template.loader import render_to_string
+from django.core.files.storage import FileSystemStorage
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+import re
 
 client = docker.from_env()
 
@@ -268,7 +272,7 @@ def deploy_compose(request):
             
             # Get all device templates
             device_ids = [device['id'] for device in selected_devices]
-            devices = DeviceTemplate.objects.filter(id__in=device_ids)
+            devices = DeviceTemplate.objects.filter(id__in(device_ids))
             device_map = {device.id: device for device in devices}
             
             # Create container records for each instance
@@ -771,3 +775,33 @@ def is_subnet_overlap(subnet1, subnet2):
         return net1.overlaps(net2)
     except ValueError:
         return False
+
+def upload_firmware(request):
+    if request.method == 'POST':
+        firmware_name = request.POST['firmware_name']
+        firmware_description = request.POST['firmware_description']
+        contact_name = request.POST['contact_name']
+        contact_email = request.POST['contact_email']
+        contact_phone = request.POST['contact_phone']
+        firmware_file = request.FILES['firmware_file']
+
+        # Validate email
+        try:
+            validate_email(contact_email)
+        except ValidationError:
+            return HttpResponse('Invalid email address', status=400)
+
+        # Validate phone number
+        phone_pattern = re.compile(r'^\+[1-9]\d{1,14}$')
+        if not phone_pattern.match(contact_phone):
+            return HttpResponse('Invalid phone number', status=400)
+
+        # Save the file
+        fs = FileSystemStorage(location='FirmwareUploads/')
+        filename = fs.save(firmware_file.name, firmware_file)
+        uploaded_file_url = fs.url(filename)
+
+        return render(request, 'upload_firmware.html', {
+            'uploaded_file_url': uploaded_file_url
+        })
+    return render(request, 'upload_firmware.html')

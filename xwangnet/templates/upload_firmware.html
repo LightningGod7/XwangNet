@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}Upload Firmware{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1>Request Addition of Firmware</h1>
+    {% if uploaded_file_url %}
+        <div class="alert alert-success" role="alert">
+            Firmware uploaded successfully: <a href="{{ uploaded_file_url }}">{{ uploaded_file_url }}</a>
+        </div>
+    {% endif %}
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <h2>Contact Information</h2>
+        <div class="mb-3">
+            <label for="contactName" class="form-label">Name</label>
+            <input type="text" class="form-control" id="contactName" name="contact_name" required>
+        </div>
+        <div class="mb-3">
+            <label for="contactEmail" class="form-label">Email</label>
+            <input type="email" class="form-control" id="contactEmail" name="contact_email" required>
+        </div>
+        <div class="mb-3">
+            <label for="contactPhone" class="form-label">Phone number</label>
+            <input type="tel" class="form-control" id="contactPhone" name="contact_phone" pattern="^\+[1-9]\d{1,14}$" required>
+        </div>
+        <h2>Firmware Information</h2>
+        <div class="mb-3">
+            <label for="firmwareName" class="form-label">Name of firmware</label>
+            <input type="text" class="form-control" id="firmwareName" name="firmware_name" required>
+        </div>
+        <div class="mb-3">
+            <label for="firmwareDescription" class="form-label">Firmware description</label>
+            <textarea class="form-control" id="firmwareDescription" name="firmware_description" required></textarea>
+        </div>
+        <div class="mb-3">
+            <label for="firmwareFile" class="form-label">Firmware file</label>
+            <input type="file" class="form-control" id="firmwareFile" name="firmware_file" required>
+        </div>
+        <button type="submit" class="btn btn-primary">Upload</button>
+    </form>
+</div>
+{% endblock %}

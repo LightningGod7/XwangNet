@@ -21,4 +21,5 @@ urlpatterns = [
     path('deployed-container/<int:container_id>/delete/', views.delete_deployed_container, name='delete_deployed_container'),
     path('networks/', views.networks, name='networks'),
     path('networks/<str:network_id>/action/', views.network_action, name='network_action'),
+    path('upload_firmware/', views.upload_firmware, name='upload_firmware'),
 ]
