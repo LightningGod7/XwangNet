@@ -59,6 +59,42 @@
                 </div>
             </div>
 
+            <!-- Snort Monitoring -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    Snort Network Monitoring
+                </div>
+                <div class="card-body">
+                    <p>Status: <span id="snort-status" class="badge bg-{{ deployment.snort_status|yesno:'success,danger' }}">
+                        {{ deployment.snort_status }}
+                    </span></p>
+                    <div class="snort-actions">
+                        <button onclick="toggleSnort('deploy')" 
+                                class="btn btn-success" 
+                                {% if deployment.snort_status == 'active' %}disabled{% endif %}>
+                            Start Monitoring
+                        </button>
+                        <button onclick="toggleSnort('stop')" 
+                                class="btn btn-danger"
+                                {% if deployment.snort_status == 'inactive' %}disabled{% endif %}>
+                            Stop Monitoring
+                        </button>
+                    </div>
+                    <div id="snort-error" class="alert alert-danger mt-3" style="display: none;"></div>
+                    
+                    <!-- Snort Logs -->
+                    <div class="logs-section mt-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Snort Logs</h6>
+                            <button onclick="toggleSnortLogs()" class="btn btn-sm btn-outline-secondary">
+                                Show/Hide Logs
+                            </button>
+                        </div>
+                        <pre id="snort-logs" class="container-logs mt-2" style="display: none;"></pre>
+                    </div>
+                </div>
+            </div>
+
             <!-- Container Controls -->
             <div class="card">
                 <div class="card-header">
@@ -506,6 +542,79 @@ window.addEventListener('beforeunload', () => {
     Object.keys(logPollingIntervals).forEach(containerId => {
         stopLogPolling(containerId);
     });
+});
+
+async function toggleSnort(action) {
+    const url = action === 'deploy' ? 
+        `/deployment/${deploymentId}/deploy-snort/` : 
+        `/deployment/${deploymentId}/stop-snort/`;
+    
+    const statusSpan = document.getElementById('snort-status');
+    const buttons = document.querySelectorAll('.snort-actions button');
+    const errorDiv = document.getElementById('snort-error');
+    
+    errorDiv.style.display = 'none';
+    buttons.forEach(btn => btn.disabled = true);
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken,
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (error) {
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
+    } finally {
+        buttons.forEach(btn => btn.disabled = false);
+    }
+}
+
+let snortLogPolling = null;
+
+function toggleSnortLogs() {
+    const logsDiv = document.getElementById('snort-logs');
+    if (logsDiv.style.display === 'none') {
+        logsDiv.style.display = 'block';
+        fetchSnortLogs();
+        snortLogPolling = setInterval(fetchSnortLogs, 2000);
+    } else {
+        logsDiv.style.display = 'none';
+        if (snortLogPolling) {
+            clearInterval(snortLogPolling);
+            snortLogPolling = null;
+        }
+    }
+}
+
+async function fetchSnortLogs() {
+    try {
+        const response = await fetch(`/deployment/${deploymentId}/snort-logs/`);
+        const data = await response.json();
+        if (data.logs) {
+            const logsDiv = document.getElementById('snort-logs');
+            logsDiv.textContent = data.logs;
+        }
+    } catch (error) {
+        console.error('Error fetching Snort logs:', error);
+    }
+}
+
+// Clean up Snort polling when leaving page
+window.addEventListener('beforeunload', () => {
+    if (snortLogPolling) {
+        clearInterval(snortLogPolling);
+    }
 });
 </script>
 

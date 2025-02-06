@@ -76,8 +76,10 @@ class Deployment(models.Model):
     description = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     network = models.ForeignKey(NetworkConfiguration, on_delete=models.CASCADE)
-    network_status = models.CharField(max_length=50, default='down')  # up/down
-    docker_network_id = models.CharField(max_length=255, null=True, blank=True)
+    network_status = models.CharField(max_length=10, default='down')
+    docker_network_id = models.CharField(max_length=64, null=True, blank=True)
+    snort_container_id = models.CharField(max_length=64, null=True, blank=True)
+    snort_status = models.CharField(max_length=10, default='inactive')
 
     def __str__(self):
         return self.name

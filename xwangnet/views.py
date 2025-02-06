@@ -12,6 +12,7 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 import re
 from concurrent.futures import ThreadPoolExecutor
+import os
 
 client = docker.from_env()
 
@@ -775,3 +776,108 @@ def upload_firmware(request):
             'uploaded_file_url': uploaded_file_url
         })
     return render(request, 'upload_firmware.html')
+
+def deploy_snort(request, deployment_id):
+    """Deploy Snort container to monitor a specific deployment network"""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+    deployment = get_object_or_404(Deployment, id=deployment_id)
+    
+    try:
+        # Get the deployment network interface name
+        deployment_network = client.networks.get(deployment.docker_network_id)
+        network_interface = f"{deployment.docker_network_id[:12]}"  # Docker bridge interface name
+        
+        # Create absolute paths for Snort volumes
+        base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+        snort_dir = os.path.join(base_dir, 'snort')
+        
+        # Ensure directories exist
+        for dir_name in ['logs']:
+            dir_path = os.path.join(snort_dir, f'{dir_name}-{deployment.id}')
+            os.makedirs(dir_path, exist_ok=True)
+
+        # Deploy Snort container with host networking to monitor bridge interface
+        snort_container = client.containers.run(
+            "ghcr.io/bengo237/snort3",
+            name=f"snort-{deployment.id}",
+            cap_add=["NET_ADMIN", "NET_RAW"],
+            volumes={
+                os.path.join(snort_dir, f'config'): {'bind': '/etc/snort', 'mode': 'rw'},
+                os.path.join(snort_dir, f'rules'): {'bind': '/etc/snort/rules', 'mode': 'rw'},
+                os.path.join(snort_dir, f'logs-{deployment.id}'): {'bind': '/var/log/snort', 'mode': 'rw'}
+            },
+            command=f"snort -i {network_interface} -c /etc/snort/snort.lua",  # Monitor the deployment's bridge interface
+            restart_policy={"Name": "unless-stopped"},
+            network_mode="host",  # Use host networking to access bridge interface
+            detach=True
+        )
+
+        # Update deployment with Snort info
+        deployment.snort_container_id = snort_container.id
+        deployment.snort_status = 'active'
+        deployment.save()
+
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Snort monitoring activated for deployment {deployment.name}'
+        })
+
+    except Exception as e:
+        # Clean up if something goes wrong
+        try:
+            if 'snort_container' in locals():
+                snort_container.remove(force=True)
+        except:
+            pass  # Ignore cleanup errors
+            
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+def stop_snort(request, deployment_id):
+    """Stop and remove Snort container for a deployment"""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+    deployment = get_object_or_404(Deployment, id=deployment_id)
+    
+    try:
+        if deployment.snort_container_id:
+            # Remove Snort container
+            container = client.containers.get(deployment.snort_container_id)
+            container.stop()
+            container.remove()
+
+            # Update deployment
+            deployment.snort_container_id = None
+            deployment.snort_status = 'inactive'
+            deployment.save()
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Snort monitoring deactivated'
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+def get_snort_logs(request, deployment_id):
+    """Get Snort logs for a deployment"""
+    deployment = get_object_or_404(Deployment, id=deployment_id)
+    
+    try:
+        if deployment.snort_container_id and deployment.snort_status == 'active':
+            container = client.containers.get(deployment.snort_container_id)
+            logs = container.logs(tail=100).decode('utf-8')
+            return JsonResponse({'status': 'success', 'logs': logs})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Snort not running'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
+
