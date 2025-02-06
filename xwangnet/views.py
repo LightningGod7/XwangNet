@@ -688,8 +688,14 @@ def network_action(request, network_id):
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
   
     try:
-        data = json.loads(request.body)
-        action = data.get('action')
+        # Get action from POST data instead of JSON body
+        action = request.POST.get('action')
+        
+        if not action:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'No action specified'
+            }, status=400)
         
         if network_id.startswith('planned_'):
             # Handle planned network actions
@@ -698,8 +704,8 @@ def network_action(request, network_id):
             if action == 'start':
                 # Create the network in Docker with optional subnet/gateway
                 ipam_config = {}
-                subnet = data.get('subnet')
-                gateway = data.get('gateway')
+                subnet = db_network.subnet
+                gateway = db_network.gateway
                 
                 if subnet or gateway:
                     ipam_pool = {}
@@ -721,6 +727,12 @@ def network_action(request, network_id):
             elif action == 'delete':
                 db_network.delete()
                 return JsonResponse({'status': 'success', 'message': 'Network configuration deleted'})
+            
+            else:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Invalid action {action} for planned network'
+                }, status=400)
         
         else:
             # Handle active network actions
@@ -729,6 +741,11 @@ def network_action(request, network_id):
             if action == 'stop':
                 network.remove()
                 return JsonResponse({'status': 'success', 'message': f'Network {network.name} removed'})
+            else:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': f'Invalid action {action} for active network'
+                }, status=400)
             
     except Exception as e:
         return JsonResponse({
