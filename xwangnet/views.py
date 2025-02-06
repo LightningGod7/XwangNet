@@ -808,7 +808,7 @@ def deploy_snort(request, deployment_id):
                 os.path.join(snort_dir, f'rules'): {'bind': '/etc/snort/rules', 'mode': 'rw'},
                 os.path.join(snort_dir, f'logs-{deployment.id}'): {'bind': '/var/log/snort', 'mode': 'rw'}
             },
-            command=f"snort -i {network_interface} -c /etc/snort/snort.lua",  # Monitor the deployment's bridge interface
+            command=f"snort -c /etc/snort/snort.lua --daq-dir /usr/local/lib/daq --daq afpacket -i {network_interface} -A console",
             restart_policy={"Name": "unless-stopped"},
             network_mode="host",  # Use host networking to access bridge interface
             detach=True
