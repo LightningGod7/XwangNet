@@ -223,14 +223,20 @@ function generatePortMappings(container) {
             </div>
             <div class="collapse" id="portMappings${container.id}">
                 <div class="port-mappings-content">
-                    ${Object.entries(container.ports).map(([host, container_port]) => `
-                        <div class="port-mapping-item">
-                            <i class="fas fa-random me-2"></i>
-                            <span class="host-port">${host}</span>
-                            <i class="fas fa-arrow-right mx-2"></i>
-                            <span class="container-port">${container_port}</span>
-                        </div>
-                    `).join('')}
+                    ${Object.entries(container.ports).map(([host, container_ports]) => {
+                        let containerPortStr = container_ports
+                            ? container_ports.map(port => `${port.HostIp}:${port.HostPort}`).join(', ')
+                            : 'N/A'; // Handle `null` case
+
+                        return `
+                            <div class="port-mapping-item">
+                                <i class="fas fa-random me-2"></i>
+                                <span class="host-port">${host}</span>
+                                <i class="fas fa-arrow-right mx-2"></i>
+                                <span class="container-port">${containerPortStr}</span>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
             </div>
         </div>
