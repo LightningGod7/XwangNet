@@ -78,8 +78,8 @@ class Deployment(models.Model):
     network = models.ForeignKey(NetworkConfiguration, on_delete=models.CASCADE)
     network_status = models.CharField(max_length=10, default='down')
     docker_network_id = models.CharField(max_length=64, null=True, blank=True)
-    snort_container_id = models.CharField(max_length=64, null=True, blank=True)
-    snort_status = models.CharField(max_length=10, default='inactive')
+    suricata_container_id = models.CharField(max_length=64, null=True, blank=True)
+    suricata_status = models.CharField(max_length=10, default='inactive')
 
     def __str__(self):
         return self.name

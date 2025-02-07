@@ -59,38 +59,38 @@
                 </div>
             </div>
 
-            <!-- Snort Monitoring -->
+            <!-- Suricata Monitoring -->
             <div class="card mb-4">
                 <div class="card-header">
-                    Snort Network Monitoring
+                    Suricata Network Monitoring
                 </div>
                 <div class="card-body">
-                    <p>Status: <span id="snort-status" class="badge bg-{{ deployment.snort_status|yesno:'success,danger' }}">
-                        {{ deployment.snort_status }}
+                    <p>Status: <span id="suricata-status" class="badge bg-{{ deployment.suricata_status|yesno:'success,danger' }}">
+                        {{ deployment.suricata_status }}
                     </span></p>
-                    <div class="snort-actions">
-                        <button onclick="toggleSnort('deploy')" 
+                    <div class="suricata-actions">
+                        <button onclick="toggleSuricata('deploy')" 
                                 class="btn btn-success" 
-                                {% if deployment.snort_status == 'active' %}disabled{% endif %}>
+                                {% if deployment.suricata_status == 'active' %}disabled{% endif %}>
                             Start Monitoring
                         </button>
-                        <button onclick="toggleSnort('stop')" 
+                        <button onclick="toggleSuricata('stop')" 
                                 class="btn btn-danger"
-                                {% if deployment.snort_status == 'inactive' %}disabled{% endif %}>
+                                {% if deployment.suricata_status == 'inactive' %}disabled{% endif %}>
                             Stop Monitoring
                         </button>
                     </div>
-                    <div id="snort-error" class="alert alert-danger mt-3" style="display: none;"></div>
+                    <div id="suricata-error" class="alert alert-danger mt-3" style="display: none;"></div>
                     
-                    <!-- Snort Logs -->
+                    <!-- Suricata Logs -->
                     <div class="logs-section mt-3">
                         <div class="d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">Snort Logs</h6>
-                            <button onclick="toggleSnortLogs()" class="btn btn-sm btn-outline-secondary">
+                            <h6 class="mb-0">Suricata Logs</h6>
+                            <button onclick="toggleSuricataLogs()" class="btn btn-sm btn-outline-secondary">
                                 Show/Hide Logs
                             </button>
                         </div>
-                        <pre id="snort-logs" class="container-logs mt-2" style="display: none;"></pre>
+                        <pre id="suricata-logs" class="container-logs mt-2" style="display: none;"></pre>
                     </div>
                 </div>
             </div>
@@ -544,14 +544,14 @@ window.addEventListener('beforeunload', () => {
     });
 });
 
-async function toggleSnort(action) {
+async function toggleSuricata(action) {
     const url = action === 'deploy' ? 
-        `/deployment/${deploymentId}/deploy-snort/` : 
-        `/deployment/${deploymentId}/stop-snort/`;
+        `/deployment/${deploymentId}/deploy-suricata/` : 
+        `/deployment/${deploymentId}/stop-suricata/`;
     
-    const statusSpan = document.getElementById('snort-status');
-    const buttons = document.querySelectorAll('.snort-actions button');
-    const errorDiv = document.getElementById('snort-error');
+    const statusSpan = document.getElementById('suricata-status');
+    const buttons = document.querySelectorAll('.suricata-actions button');
+    const errorDiv = document.getElementById('suricata-error');
     
     errorDiv.style.display = 'none';
     buttons.forEach(btn => btn.disabled = true);
@@ -580,40 +580,40 @@ async function toggleSnort(action) {
     }
 }
 
-let snortLogPolling = null;
+let suricataLogPolling = null;
 
-function toggleSnortLogs() {
-    const logsDiv = document.getElementById('snort-logs');
+function toggleSuricataLogs() {
+    const logsDiv = document.getElementById('suricata-logs');
     if (logsDiv.style.display === 'none') {
         logsDiv.style.display = 'block';
-        fetchSnortLogs();
-        snortLogPolling = setInterval(fetchSnortLogs, 2000);
+        fetchSuricataLogs();
+        suricataLogPolling = setInterval(fetchSuricataLogs, 2000);
     } else {
         logsDiv.style.display = 'none';
-        if (snortLogPolling) {
-            clearInterval(snortLogPolling);
-            snortLogPolling = null;
+        if (suricataLogPolling) {
+            clearInterval(suricataLogPolling);
+            suricataLogPolling = null;
         }
     }
 }
 
-async function fetchSnortLogs() {
+async function fetchSuricataLogs() {
     try {
-        const response = await fetch(`/deployment/${deploymentId}/snort-logs/`);
+        const response = await fetch(`/deployment/${deploymentId}/suricata-logs/`);
         const data = await response.json();
         if (data.logs) {
-            const logsDiv = document.getElementById('snort-logs');
+            const logsDiv = document.getElementById('suricata-logs');
             logsDiv.textContent = data.logs;
         }
     } catch (error) {
-        console.error('Error fetching Snort logs:', error);
+        console.error('Error fetching Suricata logs:', error);
     }
 }
 
-// Clean up Snort polling when leaving page
+// Clean up Suricata polling when leaving page
 window.addEventListener('beforeunload', () => {
-    if (snortLogPolling) {
-        clearInterval(snortLogPolling);
+    if (suricataLogPolling) {
+        clearInterval(suricataLogPolling);
     }
 });
 </script>
