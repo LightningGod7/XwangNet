@@ -12,6 +12,7 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 import re
 from concurrent.futures import ThreadPoolExecutor
+import os
 
 client = docker.from_env()
 
@@ -792,3 +793,106 @@ def upload_firmware(request):
             'uploaded_file_url': uploaded_file_url
         })
     return render(request, 'upload_firmware.html')
+
+def deploy_suricata(request, deployment_id):
+    """Deploy Suricata container to monitor a specific deployment network"""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+    deployment = get_object_or_404(Deployment, id=deployment_id)
+    
+    try:
+        # Get the deployment network interface name
+        deployment_network = client.networks.get(deployment.docker_network_id)
+        network_interface = f"{deployment.docker_network_id[:12]}"  # Docker bridge interface name
+        
+        # Create absolute paths for Suricata volumes
+        base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+        suricata_dir = os.path.join(base_dir, 'suricata')
+        
+        # Ensure directories exist
+        for dir_name in ['logs']:
+            dir_path = os.path.join(suricata_dir, f'{dir_name}-{deployment.id}')
+            os.makedirs(dir_path, exist_ok=True)
+
+        # Deploy Suricata container with host networking to monitor bridge interface
+        suricata_container = client.containers.run(
+            "jasonish/suricata:latest",
+            name=f"suricata-{deployment.id}",
+            cap_add=["NET_ADMIN", "NET_RAW"],
+            volumes={
+                os.path.join(suricata_dir, f'logs-{deployment.id}'): {'bind': '/var/log/suricata', 'mode': 'rw'}
+            },
+            restart_policy={"Name": "unless-stopped"},
+            network_mode="host",  # Use host networking to access bridge interface
+            detach=True,
+            command=f"-i br-{network_interface}"  # Add the interface
+        )
+
+        # Update deployment with Suricata info
+        deployment.suricata_container_id = suricata_container.id
+        deployment.suricata_status = 'active'
+        deployment.save()
+
+        return JsonResponse({
+            'status': 'success',
+            'message': f'Suricata monitoring activated for deployment {deployment.name}'
+        })
+
+    except Exception as e:
+        # Clean up if something goes wrong
+        try:
+            if 'suricata_container' in locals():
+                suricata_container.remove(force=True)
+        except:
+            pass  # Ignore cleanup errors
+            
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+def stop_suricata(request, deployment_id):
+    """Stop and remove Suricata container for a deployment"""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
+
+    deployment = get_object_or_404(Deployment, id=deployment_id)
+    
+    try:
+        if deployment.suricata_container_id:
+            # Remove Suricata container
+            container = client.containers.get(deployment.suricata_container_id)
+            container.stop()
+            container.remove()
+
+            # Update deployment
+            deployment.suricata_container_id = None
+            deployment.suricata_status = 'inactive'
+            deployment.save()
+
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Suricata monitoring deactivated'
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+def get_suricata_logs(request, deployment_id):
+    """Get Suricata logs for a deployment"""
+    deployment = get_object_or_404(Deployment, id=deployment_id)
+    
+    try:
+        if deployment.suricata_container_id and deployment.suricata_status == 'active':
+            container = client.containers.get(deployment.suricata_container_id)
+            logs = container.logs(tail=100).decode('utf-8')
+            return JsonResponse({'status': 'success', 'logs': logs})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Suricata not running'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
+

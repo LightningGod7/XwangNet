@@ -22,4 +22,7 @@ urlpatterns = [
     path('networks/', views.networks, name='networks'),
     path('networks/<str:network_id>/action/', views.network_action, name='network_action'),
     path('upload_firmware/', views.upload_firmware, name='upload_firmware'),
+    path('deployment/<int:deployment_id>/deploy-suricata/', views.deploy_suricata, name='deploy_suricata'),
+    path('deployment/<int:deployment_id>/stop-suricata/', views.stop_suricata, name='stop_suricata'),
+    path('deployment/<int:deployment_id>/suricata-logs/', views.get_suricata_logs, name='suricata_logs'),
 ]

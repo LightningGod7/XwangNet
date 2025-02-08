@@ -10,3 +10,4 @@ venv/
 
 # Ignore SQLite database files
 *.sqlite3
+/suricata/

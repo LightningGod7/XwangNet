@@ -59,6 +59,42 @@
                 </div>
             </div>
 
+            <!-- Suricata Monitoring -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    Suricata Network Monitoring
+                </div>
+                <div class="card-body">
+                    <p>Status: <span id="suricata-status" class="badge bg-{{ deployment.suricata_status|yesno:'success,danger' }}">
+                        {{ deployment.suricata_status }}
+                    </span></p>
+                    <div class="suricata-actions">
+                        <button onclick="toggleSuricata('deploy')" 
+                                class="btn btn-success" 
+                                {% if deployment.suricata_status == 'active' %}disabled{% endif %}>
+                            Start Monitoring
+                        </button>
+                        <button onclick="toggleSuricata('stop')" 
+                                class="btn btn-danger"
+                                {% if deployment.suricata_status == 'inactive' %}disabled{% endif %}>
+                            Stop Monitoring
+                        </button>
+                    </div>
+                    <div id="suricata-error" class="alert alert-danger mt-3" style="display: none;"></div>
+                    
+                    <!-- Suricata Logs -->
+                    <div class="logs-section mt-3">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">Suricata Logs</h6>
+                            <button onclick="toggleSuricataLogs()" class="btn btn-sm btn-outline-secondary">
+                                Show/Hide Logs
+                            </button>
+                        </div>
+                        <pre id="suricata-logs" class="container-logs mt-2" style="display: none;"></pre>
+                    </div>
+                </div>
+            </div>
+
             <!-- Container Controls -->
             <div class="card">
                 <div class="card-header">
@@ -506,6 +542,79 @@ window.addEventListener('beforeunload', () => {
     Object.keys(logPollingIntervals).forEach(containerId => {
         stopLogPolling(containerId);
     });
+});
+
+async function toggleSuricata(action) {
+    const url = action === 'deploy' ? 
+        `/deployment/${deploymentId}/deploy-suricata/` : 
+        `/deployment/${deploymentId}/stop-suricata/`;
+    
+    const statusSpan = document.getElementById('suricata-status');
+    const buttons = document.querySelectorAll('.suricata-actions button');
+    const errorDiv = document.getElementById('suricata-error');
+    
+    errorDiv.style.display = 'none';
+    buttons.forEach(btn => btn.disabled = true);
+    
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrftoken,
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            location.reload();
+        } else {
+            throw new Error(data.message);
+        }
+    } catch (error) {
+        errorDiv.textContent = error.message;
+        errorDiv.style.display = 'block';
+    } finally {
+        buttons.forEach(btn => btn.disabled = false);
+    }
+}
+
+let suricataLogPolling = null;
+
+function toggleSuricataLogs() {
+    const logsDiv = document.getElementById('suricata-logs');
+    if (logsDiv.style.display === 'none') {
+        logsDiv.style.display = 'block';
+        fetchSuricataLogs();
+        suricataLogPolling = setInterval(fetchSuricataLogs, 2000);
+    } else {
+        logsDiv.style.display = 'none';
+        if (suricataLogPolling) {
+            clearInterval(suricataLogPolling);
+            suricataLogPolling = null;
+        }
+    }
+}
+
+async function fetchSuricataLogs() {
+    try {
+        const response = await fetch(`/deployment/${deploymentId}/suricata-logs/`);
+        const data = await response.json();
+        if (data.logs) {
+            const logsDiv = document.getElementById('suricata-logs');
+            logsDiv.textContent = data.logs;
+        }
+    } catch (error) {
+        console.error('Error fetching Suricata logs:', error);
+    }
+}
+
+// Clean up Suricata polling when leaving page
+window.addEventListener('beforeunload', () => {
+    if (suricataLogPolling) {
+        clearInterval(suricataLogPolling);
+    }
 });
 </script>
 
