@@ -689,7 +689,7 @@ def network_action(request, network_id):
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
   
     try:
-        # Get action from POST data instead of JSON body
+        # Get action from POST data
         action = request.POST.get('action')
         
         if not action:
