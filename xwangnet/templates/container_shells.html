@@ -196,6 +196,7 @@ document.addEventListener('DOMContentLoaded', function() {
             statusElement.className = 'badge bg-success';
             errorElement.style.display = 'none';
             fitTerminal();
+            terminal.write('# ');
         };
         
         socket.onclose = () => {
@@ -223,19 +224,55 @@ document.addEventListener('DOMContentLoaded', function() {
             terminal.scrollToBottom();
         };
         
+        let currentLine = '';
+        let currentPosition = 0;
+        
         // Handle terminal input
         terminal.onData(data => {
             if (isConnected && socket.readyState === WebSocket.OPEN) {
-                console.log(`Sending data for ${type} shell:`, data);
-                // Check for clear command
-                if (data === '\u0003c' || data === 'clear\r') { // Ctrl+C followed by 'c' or 'clear' command
-                    terminal.clear();
+                // Handle special commands first
+                if (data === '\u0003') { // Ctrl+C
+                    currentLine = '';
+                    currentPosition = 0;
+                    terminal.write('^C\r\n');
+                    terminal.write('# ');
                     return;
                 }
-                socket.send(JSON.stringify({
-                    input: data,
-                    type: 'input'
-                }));
+
+                if (data === 'clear\r' || data === '\u0003c') { // clear command or Ctrl+C followed by c
+                    terminal.clear();
+                    currentLine = '';
+                    currentPosition = 0;
+                    terminal.write('# ');
+                    return;
+                }
+
+                if (data === '\r') { // Enter key
+                    terminal.write('\r\n');
+                    if (currentLine.trim()) {
+                        socket.send(JSON.stringify({
+                            input: currentLine + '\n',
+                            type: 'input'
+                        }));
+                    }
+                    currentLine = '';
+                    currentPosition = 0;
+                    return;
+                }
+
+                if (data === '\u007F') { // Backspace
+                    if (currentPosition > 0) {
+                        currentLine = currentLine.slice(0, -1);
+                        currentPosition--;
+                        terminal.write('\b \b');
+                    }
+                    return;
+                }
+
+                // Regular character input
+                currentLine += data;
+                currentPosition++;
+                terminal.write(data);
             }
         });
         
@@ -245,7 +282,6 @@ document.addEventListener('DOMContentLoaded', function() {
             const printable = !ev.altKey && !ev.ctrlKey && !ev.metaKey;
 
             if (ev.keyCode === 13) { // Enter key
-                // Scroll to bottom on Enter
                 terminal.scrollToBottom();
             }
         });

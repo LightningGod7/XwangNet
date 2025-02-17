@@ -87,7 +87,12 @@ class ShellServer:
                             continue
                             
                         if 'input' in data:
-                            socket.send(data['input'].encode())
+                            # Send the input to the container
+                            command = data['input']
+                            socket.send(command.encode())
+                            
+                            # Small delay to allow output to be processed
+                            await asyncio.sleep(0.05)
                             
                     except websockets.exceptions.ConnectionClosed:
                         break
@@ -100,17 +105,27 @@ class ShellServer:
 
                     # Read any available output
                     try:
-                        output = socket.recv(1024)
-                        if output:
-                            await websocket.send(output.decode())
-                    except BlockingIOError:
-                        # No data available right now, that's okay
-                        pass
+                        while True:
+                            try:
+                                output = socket.recv(1024)
+                                #strip first line of output if not have duplicate output
+                                output = output.decode().split('\n')[1:]
+                                output = '\n'.join(output)
+                                if output:
+                                    await websocket.send(output)
+                                else:
+                                    break
+                            except BlockingIOError:
+                                # No more data available
+                                break
+                            except Exception as e:
+                                print(f"Error reading output: {e}")
+                                break
                     except Exception as e:
-                        print(f"Error reading output: {e}")
+                        print(f"Error in output loop: {e}")
                         break
 
-                    # Small delay to prevent CPU overuse
+                    # Small delay between checks
                     await asyncio.sleep(0.01)
 
             finally:
@@ -134,16 +149,14 @@ class ShellServer:
             # Setup SSH client
             ssh_client = paramiko.SSHClient()
             # Load private key
-            #key_file = io.StringIO(private_key_data)  # Use StringIO to read key as a file-like object
-            key = paramiko.Ed25519Key(file_obj=key_file)
             ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
             # Connect with appropriate command
             if shell_type == 'qemu':
-                ssh_client.connect(container_ip, username='root', password='', pkey=key)
+                ssh_client.connect(container_ip, username='root', password='')
                 stdin, stdout, stderr = ssh_client.exec_command("nochroot")
             else:  # chroot
-                ssh_client.connect(container_ip, username='root', password='', pkey=key)
+                ssh_client.connect(container_ip, username='root', password='')
 
             # Get shell channel
             channel = ssh_client.invoke_shell()
