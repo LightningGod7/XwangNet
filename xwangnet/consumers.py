@@ -43,12 +43,13 @@ class ShellConsumer(AsyncWebsocketConsumer):
             await self.close()
 
     async def setup_docker_shell(self, container):
-        # Create exec instance
+        # Create exec instance with bash instead of sh for better history support
         exec_id = container.client.api.exec_create(
             container.id,
-            '/bin/sh',
+            '/bin/bash',  # Use bash instead of sh
             stdin=True,
-            tty=True
+            tty=True,
+            environment={"TERM": "xterm"}  # Set TERM for better terminal support
         )['Id']
         
         # Start the exec instance
@@ -78,8 +79,8 @@ class ShellConsumer(AsyncWebsocketConsumer):
         # Execute nochroot command for QEMU
         stdin, stdout, stderr = self.qemu_ssh_client.exec_command("nochroot")
         
-        # Get shell channel
-        self.qemu_channel = self.qemu_ssh_client.invoke_shell()
+        # Get shell channel with terminal type set
+        self.qemu_channel = self.qemu_ssh_client.invoke_shell(term='xterm')
         self.qemu_channel.setblocking(0)
 
         # Start reading output in background
@@ -95,8 +96,8 @@ class ShellConsumer(AsyncWebsocketConsumer):
         self.chroot_ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         self.chroot_ssh_client.connect(container_ip, username='root', password='')
 
-        # Get shell channel
-        self.chroot_channel = self.chroot_ssh_client.invoke_shell()
+        # Get shell channel with terminal type set
+        self.chroot_channel = self.chroot_ssh_client.invoke_shell(term='xterm')
         self.chroot_channel.setblocking(0)
 
         # Start reading output in background
@@ -134,7 +135,12 @@ class ShellConsumer(AsyncWebsocketConsumer):
             data = json.loads(text_data)
             
             if 'type' in data and data['type'] == 'resize':
-                # Handle resize events if needed
+                # Handle resize events
+                size = data.get('size', {})
+                if self.shell_type == 'qemu' and self.qemu_channel:
+                    self.qemu_channel.resize_pty(width=size.get('cols', 80), height=size.get('rows', 24))
+                elif self.shell_type == 'chroot' and self.chroot_channel:
+                    self.chroot_channel.resize_pty(width=size.get('cols', 80), height=size.get('rows', 24))
                 return
                 
             if 'input' in data:

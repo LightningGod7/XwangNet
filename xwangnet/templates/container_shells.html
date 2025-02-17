@@ -233,8 +233,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (data === '\u0003') { // Ctrl+C
                     currentLine = '';
                     currentPosition = 0;
-                    terminal.write('^C\r\n');
-                    terminal.write('# ');
+                    socket.send(JSON.stringify({
+                        input: '\u0003',
+                        type: 'input'
+                    }));
                     return;
                 }
 
@@ -246,16 +248,23 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
+                // Handle arrow keys and other special keys
+                if (data.length > 1 && data.startsWith('\x1b')) {
+                    // This is an escape sequence (arrow keys, etc)
+                    socket.send(JSON.stringify({
+                        input: data,
+                        type: 'input'
+                    }));
+                    return;
+                }
+
                 if (data === '\r') { // Enter key
-                    terminal.write('\r\n');
-                    if (currentLine.trim()) {
-                        socket.send(JSON.stringify({
-                            input: currentLine + '\n',
-                            type: 'input'
-                        }));
-                    }
                     currentLine = '';
                     currentPosition = 0;
+                    socket.send(JSON.stringify({
+                        input: data,
+                        type: 'input'
+                    }));
                     return;
                 }
 
@@ -263,7 +272,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     if (currentPosition > 0) {
                         currentLine = currentLine.slice(0, -1);
                         currentPosition--;
-                        terminal.write('\b \b');
+                        socket.send(JSON.stringify({
+                            input: '\b',
+                            type: 'input'
+                        }));
                     }
                     return;
                 }
@@ -271,7 +283,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Regular character input
                 currentLine += data;
                 currentPosition++;
-                terminal.write(data);
+                socket.send(JSON.stringify({
+                    input: data,
+                    type: 'input'
+                }));
             }
         });
         
