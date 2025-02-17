@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 from . import views
 
 urlpatterns = [
@@ -25,4 +25,5 @@ urlpatterns = [
     path('deployment/<int:deployment_id>/deploy-suricata/', views.deploy_suricata, name='deploy_suricata'),
     path('deployment/<int:deployment_id>/stop-suricata/', views.stop_suricata, name='stop_suricata'),
     path('deployment/<int:deployment_id>/suricata-logs/', views.get_suricata_logs, name='suricata_logs'),
+    path('container/<str:container_id>/shells/', views.container_shells, name='container_shells'),
 ]

@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">Container Shells - {{ container.hostname }}</h1>
+            {% if not container.container_id or container.status != 'running' %}
+            <div class="alert alert-warning">
+                This container is not running. Please start the container to access its shells.
+                <br>
+                <a href="{% url 'deployment_detail' container.deployment.id %}" class="btn btn-primary mt-2">
+                    Return to Deployment
+                </a>
+            </div>
+            {% else %}
+            <div class="row g-4">
+                <!-- Docker Shell -->
+                <div class="col-md-4">
+                    <div class="card shell-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Docker Shell</h5>
+                            <span class="badge bg-secondary" id="docker-status">Connecting...</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="docker-terminal" class="terminal-container"></div>
+                            <div id="docker-error" class="alert alert-danger m-2" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- QEMU Shell -->
+                <div class="col-md-4">
+                    <div class="card shell-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">QEMU Shell</h5>
+                            <span class="badge bg-secondary" id="qemu-status">Connecting...</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="qemu-terminal" class="terminal-container"></div>
+                            <div id="qemu-error" class="alert alert-danger m-2" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chroot Shell -->
+                <div class="col-md-4">
+                    <div class="card shell-card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Chroot Shell</h5>
+                            <span class="badge bg-secondary" id="chroot-status">Connecting...</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <div id="chroot-terminal" class="terminal-container"></div>
+                            <div id="chroot-error" class="alert alert-danger m-2" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% block extra_css %}
+<style>
+.shell-card {
+    height: calc(100vh - 100px);
+    min-height: 600px;
+    display: flex;
+    flex-direction: column;
+}
+
+.shell-card .card-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+}
+
+.terminal-container {
+    background-color: #1e1e1e;
+    flex: 1;
+    overflow: hidden;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.alert {
+    font-size: 0.875rem;
+    padding: 0.5rem 1rem;
+    margin-bottom: 0;
+}
+
+.xterm {
+    height: 100%;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.xterm-viewport {
+    overflow-y: auto !important;
+    flex: 1;
+    background-color: #1e1e1e !important;
+}
+
+.xterm-screen {
+    flex: 1;
+    background-color: #1e1e1e !important;
+}
+
+/* Hide the textarea but keep it functional */
+.xterm-helper-textarea {
+    position: absolute !important;
+    opacity: 0 !important;
+    left: -9999em !important;
+    top: 0 !important;
+    width: 0 !important;
+    height: 0 !important;
+    z-index: -10 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    resize: none !important;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+{% if container.container_id and container.status == 'running' %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/addons/fit/fit.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function setupTerminal(type) {
+        const terminal = new Terminal({
+            cursorBlink: true,
+            fontSize: 14,
+            fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+            theme: {
+                background: '#1e1e1e',
+                foreground: '#ffffff',
+                cursor: '#ffffff',
+                cursorAccent: '#000000',
+                selection: 'rgba(255, 255, 255, 0.3)',
+                black: '#000000',
+                red: '#e06c75',
+                green: '#98c379',
+                yellow: '#d19a66',
+                blue: '#61afef',
+                magenta: '#c678dd',
+                cyan: '#56b6c2',
+                white: '#abb2bf'
+            },
+            allowTransparency: true,
+            scrollback: 5000,
+            cols: 100,
+            rows: 40,
+            convertEol: true,
+            cursorStyle: 'block',
+            windowsMode: false,
+            termName: 'xterm'
+        });
+        
+        const terminalElement = document.getElementById(`${type}-terminal`);
+        const statusElement = document.getElementById(`${type}-status`);
+        const errorElement = document.getElementById(`${type}-error`);
+        
+        terminal.open(terminalElement);
+        Terminal.applyAddon(fit);
+        
+        // Ensure the terminal fits its container
+        function fitTerminal() {
+            try {
+                terminal.fit();
+                terminal.focus(); // Auto-focus the terminal
+            } catch (e) {
+                console.error('Error fitting terminal:', e);
+            }
+        }
+        
+        // Initial fit
+        setTimeout(fitTerminal, 0);
+        
+        // Connect to WebSocket server
+        const socket = new WebSocket(`ws://${window.location.hostname}:8001/ws/shell/{{ container.container_id }}/${type}`);
+        let isConnected = false;
+        
+        socket.onopen = () => {
+            console.log(`WebSocket connected for ${type} shell`);
+            isConnected = true;
+            statusElement.textContent = 'Connected';
+            statusElement.className = 'badge bg-success';
+            errorElement.style.display = 'none';
+            fitTerminal();
+        };
+        
+        socket.onclose = () => {
+            console.log(`WebSocket closed for ${type} shell`);
+            isConnected = false;
+            statusElement.textContent = 'Disconnected';
+            statusElement.className = 'badge bg-danger';
+            errorElement.textContent = 'Connection lost. Please refresh the page to reconnect.';
+            errorElement.style.display = 'block';
+            terminal.writeln('\n\x1b[1;31m=== Connection Closed ===\x1b[0m');
+        };
+        
+        socket.onerror = (error) => {
+            console.error(`WebSocket error for ${type} shell:`, error);
+            statusElement.textContent = 'Error';
+            statusElement.className = 'badge bg-danger';
+            errorElement.textContent = 'Failed to connect to the shell. Please try refreshing the page.';
+            errorElement.style.display = 'block';
+            terminal.writeln('\n\x1b[1;31m=== Connection Error ===\x1b[0m');
+        };
+        
+        socket.onmessage = (event) => {
+            console.log(`Received data for ${type} shell:`, event.data);
+            terminal.write(event.data);
+            terminal.scrollToBottom();
+        };
+        
+        // Handle terminal input
+        terminal.onData(data => {
+            if (isConnected && socket.readyState === WebSocket.OPEN) {
+                console.log(`Sending data for ${type} shell:`, data);
+                // Check for clear command
+                if (data === '\u0003c' || data === 'clear\r') { // Ctrl+C followed by 'c' or 'clear' command
+                    terminal.clear();
+                    return;
+                }
+                socket.send(JSON.stringify({
+                    input: data,
+                    type: 'input'
+                }));
+            }
+        });
+        
+        // Handle terminal key events
+        terminal.onKey(e => {
+            const ev = e.domEvent;
+            const printable = !ev.altKey && !ev.ctrlKey && !ev.metaKey;
+
+            if (ev.keyCode === 13) { // Enter key
+                // Scroll to bottom on Enter
+                terminal.scrollToBottom();
+            }
+        });
+        
+        // Handle terminal resize
+        terminal.onResize(size => {
+            if (isConnected && socket.readyState === WebSocket.OPEN) {
+                console.log(`Sending resize for ${type} shell:`, size);
+                socket.send(JSON.stringify({
+                    type: 'resize',
+                    cols: size.cols,
+                    rows: size.rows
+                }));
+            }
+        });
+        
+        return { terminal, socket, fitTerminal };
+    }
+    
+    const terminals = {
+        docker: setupTerminal('docker'),
+        qemu: setupTerminal('qemu'),
+        chroot: setupTerminal('chroot')
+    };
+    
+    // Handle window resize
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            Object.values(terminals).forEach(({ fitTerminal }) => fitTerminal());
+        }, 100);
+    });
+    
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+        Object.values(terminals).forEach(({ socket }) => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.close();
+            }
+        });
+    });
+});
+</script>
+{% endif %}
+{% endblock %}
+{% endblock %} 

@@ -181,6 +181,10 @@
                                     class="btn btn-danger btn-sm">
                                 Stop
                             </button>
+                            <a href="{% url 'container_shells' container.id %}" 
+                               class="btn btn-primary btn-sm">
+                                Access Shells
+                            </a>
                             {% endif %}
                             </div>
                             <form method="POST" action="{% url 'delete_deployed_container' container.id %}" 

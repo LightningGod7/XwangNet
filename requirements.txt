@@ -9,3 +9,5 @@ requests==2.32.3
 sqlparse==0.5.3
 urllib3==2.3.0
 -e git+https://github.com/LightningGod7/XwangNet.git@8336bcf0788f4afe3b4c224322445c745ffbab7a#egg=xwangnet
+websockets==12.0
+paramiko==3.3.1

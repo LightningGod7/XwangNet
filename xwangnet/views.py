@@ -13,6 +13,10 @@ from django.core.exceptions import ValidationError
 import re
 from concurrent.futures import ThreadPoolExecutor
 import os
+from channels.generic.websocket import AsyncWebsocketConsumer
+import asyncio
+import paramiko
+import docker.errors
 
 client = docker.from_env()
 
@@ -895,4 +899,11 @@ def get_suricata_logs(request, deployment_id):
             return JsonResponse({'status': 'error', 'message': 'Suricata not running'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)})
+
+def container_shells(request, container_id):
+    container = get_object_or_404(DeployedContainer, id=container_id)
+    return render(request, 'container_shells.html', {
+        'container': container,
+        'container_id': container.container_id
+    })
 
