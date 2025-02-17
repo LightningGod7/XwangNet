@@ -186,7 +186,7 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(fitTerminal, 0);
         
         // Connect to WebSocket server
-        const socket = new WebSocket(`ws://${window.location.hostname}:8001/ws/shell/{{ container.container_id }}/${type}`);
+        const socket = new WebSocket(`ws://${window.location.host}/ws/shell/{{ container.container_id }}/${type}`);
         let isConnected = false;
         
         socket.onopen = () => {
@@ -196,7 +196,6 @@ document.addEventListener('DOMContentLoaded', function() {
             statusElement.className = 'badge bg-success';
             errorElement.style.display = 'none';
             fitTerminal();
-            terminal.write('# ');
         };
         
         socket.onclose = () => {
