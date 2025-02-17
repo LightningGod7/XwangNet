@@ -14,6 +14,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
         self.chroot_ssh_client = None
         self.chroot_channel = None
         self.shell_type = None
+        self.read_task = None
 
     async def connect(self):
         try:
@@ -43,28 +44,38 @@ class ShellConsumer(AsyncWebsocketConsumer):
             await self.close()
 
     async def setup_docker_shell(self, container):
-        # Create exec instance with bash instead of sh for better history support
-        exec_id = container.client.api.exec_create(
-            container.id,
-            '/bin/bash',  # Use bash instead of sh
-            stdin=True,
-            tty=True,
-            environment={"TERM": "xterm"}  # Set TERM for better terminal support
-        )['Id']
-        
-        # Start the exec instance
-        self.socket = container.client.api.exec_start(
-            exec_id,
-            socket=True,
-            tty=True,
-            stream=True
-        )._sock
+        try:
+            # Create exec instance with bash instead of sh for better history support
+            exec_id = container.client.api.exec_create(
+                container.id,
+                '/bin/bash',  # Use bash instead of sh
+                stdin=True,
+                tty=True,
+                environment={"TERM": "xterm"}  # Set TERM for better terminal support
+            )['Id']
+            
+            # Start the exec instance
+            self.socket = container.client.api.exec_start(
+                exec_id,
+                socket=True,
+                tty=True,
+                stream=True
+            )._sock
 
-        # Set socket to non-blocking mode
-        self.socket.setblocking(False)
+            # Set socket to non-blocking mode
+            self.socket.setblocking(False)
 
-        # Start reading output in background
-        asyncio.create_task(self.read_docker_output())
+            # Start reading output in background
+            self.read_task = asyncio.create_task(self.read_docker_output())
+        except Exception as e:
+            print(f"Error setting up docker shell: {e}")
+            if self.socket:
+                try:
+                    self.socket.close()
+                except:
+                    pass
+                self.socket = None
+            await self.close()
 
     async def setup_qemu_shell(self, container):
         # Get container IP
@@ -104,11 +115,21 @@ class ShellConsumer(AsyncWebsocketConsumer):
         asyncio.create_task(self.read_chroot_output())
 
     async def disconnect(self, close_code):
+        # Cancel the read task if it exists
+        if self.read_task:
+            self.read_task.cancel()
+            try:
+                await self.read_task
+            except asyncio.CancelledError:
+                pass
+
         if self.socket:
             try:
                 self.socket.close()
             except:
                 pass
+            self.socket = None
+
         if self.qemu_channel:
             try:
                 self.qemu_channel.close()
@@ -132,6 +153,9 @@ class ShellConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data):
         try:
+            if not self.socket and not self.qemu_channel and not self.chroot_channel:
+                return
+
             data = json.loads(text_data)
             
             if 'type' in data and data['type'] == 'resize':
@@ -146,7 +170,11 @@ class ShellConsumer(AsyncWebsocketConsumer):
             if 'input' in data:
                 command = data['input']
                 if self.shell_type == 'docker' and self.socket:
-                    self.socket.send(command.encode())
+                    try:
+                        self.socket.send(command.encode())
+                    except Exception as e:
+                        print(f"Error sending to docker socket: {e}")
+                        await self.close()
                 elif self.shell_type == 'qemu' and self.qemu_channel:
                     self.qemu_channel.send(command)
                 elif self.shell_type == 'chroot' and self.chroot_channel:
@@ -158,10 +186,16 @@ class ShellConsumer(AsyncWebsocketConsumer):
     async def read_docker_output(self):
         try:
             while True:
+                if not self.socket:
+                    break
+
                 try:
                     output = self.socket.recv(1024)
                     if output:
                         await self.send(text_data=output.decode())
+                    else:
+                        # Connection closed by the server
+                        break
                 except BlockingIOError:
                     await asyncio.sleep(0.01)
                 except Exception as e:
@@ -170,6 +204,8 @@ class ShellConsumer(AsyncWebsocketConsumer):
 
         except Exception as e:
             print(f"Error in docker output loop: {e}")
+        finally:
+            # Ensure we close the connection when the read loop ends
             await self.close()
 
     async def read_qemu_output(self):
