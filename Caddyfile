@@ -7,9 +7,8 @@
 }
 
 
-
 # Handle Django routes
-:80 {
+localhost:80 {
     handle /api/* {
         reverse_proxy localhost:8000 {
             header_up Host {host}

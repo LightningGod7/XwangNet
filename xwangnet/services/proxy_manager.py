@@ -19,10 +19,6 @@ class ProxyManager:
         try:
             logger.info(f"Adding proxy for {hostname} -> {container_ip}:{container_port}")
             
-            # Get current Caddy config
-            current_config = requests.get(f"{ProxyManager.CADDY_ADMIN_URL}/config/").json()
-            logger.debug(f"Current Caddy config: {json.dumps(current_config, indent=2)}")
-
             # First, check if the route already exists
             try:
                 requests.delete(
