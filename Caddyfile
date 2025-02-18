@@ -1,0 +1,33 @@
+{
+    admin 0.0.0.0:2019
+    debug
+    auto_https off  # Disable automatic HTTPS
+    http_port 80    # Explicitly set HTTP port
+    https_port 443  # Explicitly set HTTPS port
+}
+
+
+
+# Handle Django routes
+:80 {
+    handle /api/* {
+        reverse_proxy localhost:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_down Set-Cookie {>Set-Cookie}
+        }
+    }
+
+    handle /* {
+        reverse_proxy localhost:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_down Set-Cookie {>Set-Cookie}
+        }
+    }
+}
+

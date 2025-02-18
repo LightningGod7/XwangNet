@@ -17,6 +17,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 import asyncio
 import paramiko
 import docker.errors
+from xwangnet.services.proxy_manager import ProxyManager
 
 client = docker.from_env()
 
@@ -454,20 +455,94 @@ def container_action(request, container_id):
             container.container_id = docker_container.id
             container.status = 'running'
             container.save()
+
+            # Handle webtop proxy if this is a webtop container
+            if container.device.name == 'webtop':
+                # Wait briefly for container to be ready 
+                #TODO: Poll for the status of the container with a timeout. Once container is running, continue.
+                import time
+                time.sleep(2)
+                
+                docker_container.reload()  # Reload to get fresh container info
+                container_info = docker_container.attrs
+                network_settings = container_info['NetworkSettings']['Networks']
+                network_info = network_settings.get(container.deployment.network.name)
+                
+                if network_info and network_info.get('IPAddress'):  # Make sure we have an IP
+                    hostname = ProxyManager.generate_webtop_hostname()
+                    container_ip = network_info['IPAddress']
+                    
+                    print(f"Container IP: {container_ip}")  # Debug print
+                    
+                    success = ProxyManager.add_webtop_proxy(
+                        hostname,
+                        container_ip,  # This should be a valid IP address
+                        3000  # Webtop default port
+                    )
+                    
+                    if success:
+                        print(f"Successfully added proxy for {hostname} -> {container_ip}:3000")
+                        container.hostname = hostname
+                        container.save()
+                        
+                else:
+                    print(f"Network info: {network_info}")  # Debug print
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': 'Could not get container IP address'
+                    }, status=500)
             
-        elif action in ['stop', 'restart'] and container.container_id:
-            docker_container = client.containers.get(container.container_id)
-            if action == 'stop':
+        elif action == 'stop':
+            if container.container_id:
+                docker_container = client.containers.get(container.container_id)
                 docker_container.stop()
                 container.status = 'stopped'
-            else:
+                
+                # Remove proxy if this is a webtop container
+                if container.device.name == 'webtop' and container.hostname:
+                    ProxyManager.remove_webtop_proxy(container.hostname)
+                
+                container.save()
+                
+        elif action == 'restart':
+            if container.container_id:
+                docker_container = client.containers.get(container.container_id)
                 docker_container.restart()
-            container.save()
+                
+                # Handle webtop proxy reconfiguration if needed
+                if container.device.name == 'webtop':
+                    # Remove old proxy
+                    if container.hostname:
+                        ProxyManager.remove_webtop_proxy(container.hostname)
+                    
+                    # Wait briefly for container to be ready
+                    import time
+                    time.sleep(2)
+                    
+                    # Add new proxy
+                    container_info = docker_container.attrs
+                    network_settings = container_info['NetworkSettings']['Networks']
+                    network_info = network_settings.get(container.deployment.network.name)
+                    
+                    if network_info:
+                        hostname = ProxyManager.generate_webtop_hostname()
+                        container_ip = network_info['IPAddress']
+                        
+                        success = ProxyManager.add_webtop_proxy(
+                            hostname,
+                            container_ip,
+                            3000
+                        )
+                        
+                        if success:
+                            container.hostname = hostname
+                            container.save()
             
         return JsonResponse({
             'status': 'success', 
             'container_status': container.status,
-            'container_id': container.container_id
+            'container_id': container.container_id,
+            'hostname': container.hostname if container.device.name == 'webtop' else None
         })
     except docker.errors.APIError as e:
         return JsonResponse({
@@ -540,6 +615,10 @@ def delete_deployed_container(request, container_id):
                     docker_container.remove()
                 except docker.errors.NotFound:
                     pass  # Container already removed from Docker
+                
+            # Remove proxy if this is a webtop container
+            if container.device.name == 'webtop' and container.hostname:
+                ProxyManager.remove_webtop_proxy(container.hostname)
                 
             # Delete the DeployedContainer record
             container.delete()

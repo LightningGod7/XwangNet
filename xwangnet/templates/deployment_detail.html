@@ -185,6 +185,13 @@
                                class="btn btn-primary btn-sm">
                                 Access Shells
                             </a>
+                            {% if container.device.name == 'webtop' and container.status == 'running' and container.hostname %}
+                            <a href="http://{{ container.hostname }}" 
+                                target="_blank" 
+                                class="btn btn-primary btn-sm">
+                                Access Webtop
+                                </a>
+                            {% endif %}
                             {% endif %}
                             </div>
                             <form method="POST" action="{% url 'delete_deployed_container' container.id %}" 
