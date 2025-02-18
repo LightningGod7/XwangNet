@@ -3,6 +3,8 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 import docker
 import asyncio
 import paramiko
+import os
+from django.conf import settings
 
 class ShellConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
@@ -15,6 +17,8 @@ class ShellConsumer(AsyncWebsocketConsumer):
         self.chroot_channel = None
         self.shell_type = None
         self.read_task = None
+        # Get the absolute path to the key file
+        self.key_path = os.path.join(settings.BASE_DIR, 'xwangnet', 'key.pem')
 
     async def connect(self):
         try:
@@ -78,41 +82,104 @@ class ShellConsumer(AsyncWebsocketConsumer):
             await self.close()
 
     async def setup_qemu_shell(self, container):
-        # Get container IP
-        networks = container.attrs['NetworkSettings']['Networks'].values()
-        container_ip = next(iter(networks))['IPAddress']
+        try:
+            # Get container IP
+            networks = container.attrs['NetworkSettings']['Networks'].values()
+            container_ip = next(iter(networks))['IPAddress']
+            
+            if not container_ip:
+                print(f"No IP address found for container")
+                await self.close()
+                return
 
-        # Setup SSH client for QEMU
-        self.qemu_ssh_client = paramiko.SSHClient()
-        self.qemu_ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.qemu_ssh_client.connect(container_ip, username='root', password='')
+            # Setup SSH client for QEMU
+            self.qemu_ssh_client = paramiko.SSHClient()
+            qemu_ssh_key = paramiko.ECDSAKey.from_private_key_file(self.key_path)
+            self.qemu_ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            try:
+                self.qemu_ssh_client.connect(
+                    container_ip,
+                    username='root',
+                    pkey=qemu_ssh_key,
+                    timeout=10
+                )
+            except Exception as e:
+                print(f"SSH connection error for QEMU: {str(e)}")
+                await self.close()
+                return
 
-        # Execute nochroot command for QEMU
-        stdin, stdout, stderr = self.qemu_ssh_client.exec_command("nochroot")
-        
-        # Get shell channel with terminal type set
-        self.qemu_channel = self.qemu_ssh_client.invoke_shell(term='xterm')
-        self.qemu_channel.setblocking(0)
+            # Execute nochroot command for QEMU
+            try:
+                stdin, stdout, stderr = self.qemu_ssh_client.exec_command("nochroot")
+            except Exception as e:
+                print(f"Error executing nochroot command: {str(e)}")
+                await self.close()
+                return
+            
+            # Get shell channel with terminal type set
+            try:
+                self.qemu_channel = self.qemu_ssh_client.invoke_shell(term='xterm')
+                self.qemu_channel.setblocking(0)
+            except Exception as e:
+                print(f"Error setting up shell channel: {str(e)}")
+                await self.close()
+                return
 
-        # Start reading output in background
-        asyncio.create_task(self.read_qemu_output())
+            # Start reading output in background
+            asyncio.create_task(self.read_qemu_output())
+            
+        except Exception as e:
+            print(f"Error in setup_qemu_shell: {str(e)}")
+            if self.qemu_ssh_client:
+                self.qemu_ssh_client.close()
+            await self.close()
 
     async def setup_chroot_shell(self, container):
-        # Get container IP
-        networks = container.attrs['NetworkSettings']['Networks'].values()
-        container_ip = next(iter(networks))['IPAddress']
+        try:
+            # Get container IP
+            networks = container.attrs['NetworkSettings']['Networks'].values()
+            container_ip = next(iter(networks))['IPAddress']
+            
+            if not container_ip:
+                print(f"No IP address found for container")
+                await self.close()
+                return
 
-        # Setup SSH client for chroot
-        self.chroot_ssh_client = paramiko.SSHClient()
-        self.chroot_ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        self.chroot_ssh_client.connect(container_ip, username='root', password='')
+            # Setup SSH client for chroot
+            self.chroot_ssh_client = paramiko.SSHClient()
+            chroot_ssh_key = paramiko.ECDSAKey.from_private_key_file(self.key_path)
+            self.chroot_ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            try:
+                self.chroot_ssh_client.connect(
+                    container_ip,
+                    username='root',
+                    pkey=chroot_ssh_key,
+                    timeout=10
+                )
+            except Exception as e:
+                print(f"SSH connection error for Chroot: {str(e)}")
+                await self.close()
+                return
 
-        # Get shell channel with terminal type set
-        self.chroot_channel = self.chroot_ssh_client.invoke_shell(term='xterm')
-        self.chroot_channel.setblocking(0)
+            # Get shell channel with terminal type set
+            try:
+                self.chroot_channel = self.chroot_ssh_client.invoke_shell(term='xterm')
+                self.chroot_channel.setblocking(0)
+            except Exception as e:
+                print(f"Error setting up shell channel: {str(e)}")
+                await self.close()
+                return
 
-        # Start reading output in background
-        asyncio.create_task(self.read_chroot_output())
+            # Start reading output in background
+            asyncio.create_task(self.read_chroot_output())
+            
+        except Exception as e:
+            print(f"Error in setup_chroot_shell: {str(e)}")
+            if self.chroot_ssh_client:
+                self.chroot_ssh_client.close()
+            await self.close()
 
     async def disconnect(self, close_code):
         # Cancel the read task if it exists
