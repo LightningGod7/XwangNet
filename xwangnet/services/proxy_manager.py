@@ -18,15 +18,6 @@ class ProxyManager:
     def add_webtop_proxy(hostname, container_ip, container_port):
         try:
             logger.info(f"Adding proxy for {hostname} -> {container_ip}:{container_port}")
-            
-            # First, check if the route already exists
-            try:
-                requests.delete(
-                    f"{ProxyManager.CADDY_ADMIN_URL}/config/apps/http/servers/srv0/routes/@id/{hostname}"
-                )
-                logger.info(f"Removed existing route for {hostname}")
-            except Exception as e:
-                logger.debug(f"No existing route to remove for {hostname}: {str(e)}")
 
             # Configure the route
             route_config = {
@@ -68,13 +59,13 @@ class ProxyManager:
         try:
             logger.info(f"Removing proxy for {hostname}")
             response = requests.delete(
-                f"{ProxyManager.CADDY_ADMIN_URL}/config/apps/http/servers/srv0/routes/@id/{hostname}"
+                f"{ProxyManager.CADDY_ADMIN_URL}/id/{hostname}"
             )
             success = response.status_code == 200
             if success:
                 logger.info(f"Successfully removed proxy for {hostname}")
             else:
-                logger.error(f"Failed to remove proxy for {hostname}. Status: {response.status_code}")
+                logger.error(f"Failed to remove proxy for {hostname}. Status: {response.status_code}. Response: {response.text}")
             return success
         except Exception as e:
             logger.error(f"Error removing proxy: {str(e)}")

@@ -18,6 +18,7 @@ import asyncio
 import paramiko
 import docker.errors
 from xwangnet.services.proxy_manager import ProxyManager
+import time
 
 client = docker.from_env()
 
@@ -458,10 +459,24 @@ def container_action(request, container_id):
 
             # Handle webtop proxy if this is a webtop container
             if container.device.name == 'webtop':
-                # Wait briefly for container to be ready 
-                #TODO: Poll for the status of the container with a timeout. Once container is running, continue.
-                import time
-                time.sleep(2)
+                # Poll for container to be ready with timeout
+                max_retries = 30  # 30 seconds timeout
+                retry_interval = 1  # 1 second between checks
+                
+                for _ in range(max_retries):
+                    docker_container.reload()  # Refresh container info
+                    if docker_container.status == 'running':
+                        # Check if container is actually responding
+                        try:
+                            # Get container health status if available
+                            health = docker_container.attrs.get('State', {}).get('Health', {}).get('Status')
+                            if health == 'healthy' or health is None:  # None means no health check defined
+                                break
+                        except:
+                            pass
+                    time.sleep(retry_interval)
+                else:  # Loop completed without break - container not ready
+                    raise Exception("Container failed to start within timeout period")
                 
                 docker_container.reload()  # Reload to get fresh container info
                 container_info = docker_container.attrs
@@ -515,9 +530,24 @@ def container_action(request, container_id):
                     if container.hostname:
                         ProxyManager.remove_webtop_proxy(container.hostname)
                     
-                    # Wait briefly for container to be ready
-                    import time
-                    time.sleep(2)
+                # Poll for container to be ready with timeout
+                max_retries = 30  # 30 seconds timeout
+                retry_interval = 1  # 1 second between checks
+                
+                for _ in range(max_retries):
+                    docker_container.reload()  # Refresh container info
+                    if docker_container.status == 'running':
+                        # Check if container is actually responding
+                        try:
+                            # Get container health status if available
+                            health = docker_container.attrs.get('State', {}).get('Health', {}).get('Status')
+                            if health == 'healthy' or health is None:  # None means no health check defined
+                                break
+                        except:
+                            pass
+                    time.sleep(retry_interval)
+                else:  # Loop completed without break - container not ready
+                    raise Exception("Container failed to start within timeout period")
                     
                     # Add new proxy
                     container_info = docker_container.attrs
