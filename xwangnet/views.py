@@ -204,7 +204,6 @@ def compose_preview(request):
     
     yaml_content = yaml.dump(compose_data, default_flow_style=False)
     return render(request, 'compose_preview.html', {
-        'yaml_content': yaml_content,
         'network': network
     })
 

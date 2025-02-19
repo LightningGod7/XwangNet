@@ -2,11 +2,10 @@
 
 {% block content %}
 <div class="container">
-    <h1>Docker Compose Preview</h1>
+    <h1>Deployment Information</h1>
     
     <div class="card mb-4">
         <div class="card-body">
-            <h5 class="card-title">Deployment Information</h5>
             <form id="deploymentForm" class="needs-validation" novalidate>
                 {% csrf_token %}
                 <div class="mb-3">
@@ -22,17 +21,8 @@
             </form>
         </div>
     </div>
-
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Docker Compose Configuration</h5>
-            <pre>{{ yaml_content }}</pre>
-        </div>
-    </div>
-    
     <div class="controls">
         <button onclick="deployCompose()" class="btn btn-success">Deploy</button>
-        <button onclick="downloadCompose()" class="btn btn-primary">Download</button>
     </div>
     
     <div id="status" class="mt-4"></div>
@@ -89,15 +79,6 @@ function deployCompose() {
         deployButton.disabled = false;
         deployButton.innerHTML = 'Deploy';
     });
-}
-
-function downloadCompose() {
-    const blob = new Blob([`{{ yaml_content|escapejs }}`], { type: 'text/yaml' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'docker-compose.yml';
-    a.click();
 }
 </script>
 {% endblock %} 
