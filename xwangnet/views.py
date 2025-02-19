@@ -110,6 +110,7 @@ def container_list_api(request):
                 'health_status': container.attrs.get('State', {}).get('Health', {}).get('Status', 'No health check'),
                 'health_log': container.attrs.get('State', {}).get('Health', {}).get('Log', [])[-3:] if isinstance(container.attrs.get('State', {}).get('Health', {}).get('Log', []), list) else ['No health logs'],
                 'device_name': deployed_container.device.name,
+                'is_isolated': deployment.network.isolated if deployment.network else None,
                 **stats
             }
             containers_data.append(container_info)
@@ -175,7 +176,7 @@ def compose_preview(request):
         'version': '3.9',
         'networks': {
             network.name: {
-                'driver': network.network_type,
+                'driver': 'bridge',
                 'ipam': {
                     'config': [{'subnet': network.subnet, 'gateway': network.gateway}]
                 }
@@ -367,7 +368,8 @@ def toggle_network(request, deployment_id):
                 # Check if subnet and gateway are provided
                 network_params = {
                     'name': deployment.network.name,
-                    'driver': deployment.network.network_type,
+                    'driver': 'bridge',
+                    'internal': deployment.network.isolated
                 }
 
                 # Only add IPAM config if both subnet and gateway are provided
@@ -783,11 +785,12 @@ def networks(request):
             network_info = {
                 'id': f'planned_{network.id}',
                 'name': network.name,
-                'driver': network.network_type,
+                'driver': 'bridge',
                 'subnet': network.subnet,
                 'gateway': network.gateway,
                 'status': 'planned',
-                'container_count': 0
+                'container_count': 0,
+                'internal': network.isolated
             }
             networks_data.append(network_info)
     
@@ -835,7 +838,8 @@ def network_action(request, network_id):
                 
                 network = client.networks.create(
                     name=db_network.name,
-                    driver=db_network.network_type,
+                    driver='bridge',
+                    internal=db_network.isolated,
                     ipam=ipam_config if ipam_config else None
                 )
                 return JsonResponse({'status': 'success', 'message': f'Network {db_network.name} created'})

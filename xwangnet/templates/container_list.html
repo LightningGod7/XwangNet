@@ -120,6 +120,7 @@ function generateContainerCard(container) {
                             <p><strong>Image:</strong> ${container.image}</p>
                             <p><strong>ID:</strong> ${container.id}</p>
                             <p><strong>Network:</strong> ${container.network || 'None'}</p>
+                            <p><strong>Isolated:</strong> ${container.is_isolated === true ? "True" : container.is_isolated === false ? "False" : "None"}</p>
                             <p><strong>Created:</strong> ${new Date(container.created).toLocaleString()}</p>
                         </div>
                         <div class="col-md-6">

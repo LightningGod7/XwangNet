@@ -43,6 +43,7 @@
                     <p>Status: <span id="network-status" class="badge bg-{{ deployment.network_status|yesno:'success,danger' }}">
                         {{ deployment.network_status }}
                     </span></p>
+                    <p>Isolated: {{deployment.network.isolated}}</p>
                     <div class="network-actions">
                         <button onclick="toggleNetwork('up')" 
                                 class="btn btn-success" 
@@ -164,7 +165,7 @@
                         <p>Status: <span class="container-status badge bg-{{ container.status|yesno:'success,danger' }}">
                             {{ container.status }}
                         </span></p>
-                        <p id=internal-ip>{{ container.internal_ip }}</p>
+                        <p id=internal-ip>IP Addr: {{ container.internal_ip }}</p>
                         <div class="d-flex gap-2 mb-2">
                             <div class="btn-group">
                             {% if container.status == 'stopped' %}

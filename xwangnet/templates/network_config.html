@@ -5,18 +5,18 @@
 {% block content %}
 <div class="form-container">
     <h1 class="mb-4">Configure Network</h1>
-    
+
     <div class="card">
         <div class="card-body">
             <form method="post" class="needs-validation" novalidate>
                 {% csrf_token %}
-                
+
                 <div class="mb-3">
                     <label for="id_name" class="form-label">Network Name</label>
-                    <input type="text" 
-                           class="form-control {% if form.name.errors %}is-invalid{% endif %}" 
-                           id="id_name" 
-                           name="name" 
+                    <input type="text"
+                           class="form-control {% if form.name.errors %}is-invalid{% endif %}"
+                           id="id_name"
+                           name="name"
                            value="{{ form.name.value|default:'' }}"
                            required>
                     {% if form.name.errors %}
@@ -27,30 +27,24 @@
                     <div class="form-text">Choose a unique name for your network</div>
                 </div>
 
-                <div class="mb-3">
-                    <label for="id_network_type" class="form-label">Network Type</label>
-                    <select class="form-select {% if form.network_type.errors %}is-invalid{% endif %}" 
-                            id="id_network_type" 
-                            name="network_type"
-                            required>
-                        <option value="">Select network type</option>
-                        <option value="bridge" {% if form.network_type.value == 'bridge' %}selected{% endif %}>Bridge</option>
-                        <option value="host" {% if form.network_type.value == 'host' %}selected{% endif %}>Host-only</option>
-                    </select>
-                    {% if form.network_type.errors %}
-                        <div class="invalid-feedback">
-                            {{ form.network_type.errors|join:", " }}
-                        </div>
-                    {% endif %}
-                    <div class="form-text">Bridge networks are isolated, Host-only networks can't access external networks</div>
+                <!-- New Isolated Network Switch -->
+                <div class="form-check form-switch mb-3">
+                    <input type="checkbox"
+                           class="form-check-input {% if form.isolated.errors %}is-invalid{% endif %}"
+                           id="id_isolated"
+                           name="isolated"
+                           value="true"
+                           {% if form.isolated.value %}checked{% endif %}>
+                    <label class="form-check-label" for="id_isolated">Isolated Network</label>
+                    <div class="form-text">Switch on for an isolated network.</div>
                 </div>
 
                 <div class="mb-3">
                     <label for="id_subnet" class="form-label">Subnet (Optional)</label>
-                    <input type="text" 
-                           class="form-control {% if form.subnet.errors %}is-invalid{% endif %}" 
-                           id="id_subnet" 
-                           name="subnet" 
+                    <input type="text"
+                           class="form-control {% if form.subnet.errors %}is-invalid{% endif %}"
+                           id="id_subnet"
+                           name="subnet"
                            value="{{ form.subnet.value|default:'' }}"
                            placeholder="e.g., 172.16.0.0/16">
                     {% if form.subnet.errors %}
@@ -63,10 +57,10 @@
 
                 <div class="mb-3">
                     <label for="id_gateway" class="form-label">Gateway (Optional)</label>
-                    <input type="text" 
-                           class="form-control {% if form.gateway.errors %}is-invalid{% endif %}" 
-                           id="id_gateway" 
-                           name="gateway" 
+                    <input type="text"
+                           class="form-control {% if form.gateway.errors %}is-invalid{% endif %}"
+                           id="id_gateway"
+                           name="gateway"
                            value="{{ form.gateway.value|default:'' }}"
                            placeholder="e.g., 172.16.0.1">
                     {% if form.gateway.errors %}
@@ -85,29 +79,28 @@
         </div>
     </div>
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
 <script>
     (function () {
         'use strict'
-        
+
         const forms = document.querySelectorAll('.needs-validation')
         const subnetInput = document.getElementById('id_subnet')
         const gatewayInput = document.getElementById('id_gateway')
-        
+
         Array.prototype.slice.call(forms).forEach(function (form) {
             form.addEventListener('submit', function (event) {
                 if (!form.checkValidity()) {
                     event.preventDefault()
                     event.stopPropagation()
                 }
-                
+
                 // Remove any previous validation classes
                 subnetInput.classList.remove('is-invalid')
                 gatewayInput.classList.remove('is-invalid')
-                
+
                 // Custom validation: if one is filled, both must be filled
                 if ((subnetInput.value && !gatewayInput.value) || 
                     (!subnetInput.value && gatewayInput.value)) {
@@ -121,7 +114,7 @@
                     event.preventDefault()
                     event.stopPropagation()
                 }
-                
+
                 form.classList.add('was-validated')
             }, false)
         })
@@ -140,15 +133,6 @@
                 console.error('Error auto-populating gateway:', e)
             }
         })
-
-        // Network type help tooltip
-        const networkTypeSelect = document.getElementById('id_network_type')
-        networkTypeSelect.addEventListener('change', function() {
-            const helpText = this.value === 'host' 
-                ? 'Host-only networks are completely isolated from external networks'
-                : 'Bridge networks allow controlled access to external networks'
-            this.nextElementSibling.nextElementSibling.textContent = helpText
-        })
     })()
 </script>
-{% endblock %} 
+{% endblock %}

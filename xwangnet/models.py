@@ -53,12 +53,7 @@ class DeviceTemplate(models.Model):
 
 class NetworkConfiguration(models.Model):
     name = models.CharField(max_length=255, unique=True)
-    NETWORK_TYPES = [
-        ('bridge', 'Bridge'),
-        ('host', 'Host-only'),
-    ]
-    
-    network_type = models.CharField(max_length=10, choices=NETWORK_TYPES)
+    isolated = models.BooleanField(default=False)
     subnet = models.CharField(max_length=255, blank=True)
     gateway = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
