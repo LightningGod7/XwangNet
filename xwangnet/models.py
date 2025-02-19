@@ -93,6 +93,7 @@ class DeployedContainer(models.Model):
     status = models.CharField(max_length=50, default='stopped')  # running/stopped/error
     hostname = models.CharField(max_length=255, null=True, blank=True)  # Added for webtop proxy
     created_at = models.DateTimeField(auto_now_add=True)
+    internal_ip = models.GenericIPAddressField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.deployment.name} - {self.device.name}"

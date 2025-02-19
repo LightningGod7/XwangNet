@@ -306,7 +306,7 @@ class DeployedContainerAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Container Information', {
-            'fields': ('hostname', 'status', 'container_id', 'created_at')
+            'fields': ('hostname', 'status', 'internal_ip', 'container_id', 'created_at')
         }),
         ('Relationships', {
             'fields': ('deployment', 'device')

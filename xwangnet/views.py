@@ -452,8 +452,10 @@ def container_action(request, container_id):
                 detach=True,
                 remove=True
             )
+            docker_container.reload()
             container.container_id = docker_container.id
             container.status = 'running'
+            container.internal_ip = docker_container.attrs['NetworkSettings']['Networks'].get(container.deployment.network.name)['IPAddress']
             container.save()
 
             # Handle webtop proxy if this is a webtop container
@@ -571,7 +573,8 @@ def container_action(request, container_id):
             'status': 'success', 
             'container_status': container.status,
             'container_id': container.container_id,
-            'hostname': container.hostname if container.device.name == 'webtop' else None
+            'hostname': container.hostname if container.device.name == 'webtop' else None,
+            'internal_ip': container.internal_ip
         })
     except docker.errors.APIError as e:
         return JsonResponse({
