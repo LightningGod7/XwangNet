@@ -938,9 +938,10 @@ def deploy_suricata(request, deployment_id):
         suricata_container = client.containers.run(
             "jasonish/suricata:latest",
             name=f"suricata-{deployment.id}",
-            cap_add=["NET_ADMIN", "NET_RAW"],
+            cap_add=["NET_ADMIN", "NET_RAW", "SYS_NICE"],
             volumes={
-                os.path.join(suricata_dir, f'logs-{deployment.id}'): {'bind': '/var/log/suricata', 'mode': 'rw'}
+                os.path.join(suricata_dir, f'logs-{deployment.id}'): {'bind': '/var/log/suricata', 'mode': 'rw'},
+                os.path.join(suricata_dir, 'configs'): {'bind': '/etc/suricata', 'mode': 'rw'}  # Add config volume
             },
             restart_policy={"Name": "unless-stopped"},
             network_mode="host",  # Use host networking to access bridge interface
