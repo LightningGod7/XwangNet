@@ -4,7 +4,7 @@
 <div class="container-fluid">
     <div class="row">
         <!-- Sidebar -->
-        <div class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+        <div class="col-md-3 col-lg-2 d-md-block sidebar">
             <div class="position-sticky pt-3">
                 <h6 class="sidebar-heading px-3 mt-4 mb-1 text-muted">
                     Deployments
@@ -633,11 +633,40 @@ window.addEventListener('beforeunload', () => {
 </script>
 
 <style>
+:root {
+    --container-bg: #f8f9fa;
+    --container-border: #dee2e6;
+    --alert-danger-bg: #f8d7da;
+    --alert-danger-border: #f5c6cb;
+    --alert-danger-text: #721c24;
+    --logs-bg: #1e1e1e;
+    --logs-text: #ffffff;
+    --border-color: #dee2e6;
+}
+
+[data-bs-theme="dark"] {
+    --container-bg: #343a40;
+    --container-border: #495057;
+    --alert-danger-bg: #2c0b0e;
+    --alert-danger-border: #842029;
+    --alert-danger-text: #ea868f;
+    --logs-bg: #212529;
+    --logs-text: #f8f9fa;
+    --border-color: #495057;
+}
+
+.sidebar {
+    background-color: var(--secondary-bg);
+    border-right: 1px solid var(--border-color);
+    transition: background-color 0.3s ease;
+}
+
 .container-item {
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--container-border);
     padding: 15px;
     border-radius: 4px;
-    background-color: #f8f9fa;
+    background-color: var(--container-bg);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .alert {
@@ -647,14 +676,15 @@ window.addEventListener('beforeunload', () => {
 }
 
 .alert-danger {
-    background-color: #f8d7da;
-    border-color: #f5c6cb;
-    color: #721c24;
+    background-color: var(--alert-danger-bg);
+    border-color: var(--alert-danger-border);
+    color: var(--alert-danger-text);
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
 }
 
 .container-logs {
-    background-color: #1e1e1e;
-    color: #ffffff;
+    background-color: var(--logs-bg);
+    color: var(--logs-text);
     padding: 10px;
     border-radius: 4px;
     max-height: 300px;
@@ -663,11 +693,43 @@ window.addEventListener('beforeunload', () => {
     font-size: 12px;
     white-space: pre-wrap;
     word-wrap: break-word;
+    transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 .logs-section {
-    border-top: 1px solid #dee2e6;
+    border-top: 1px solid var(--border-color);
     padding-top: 10px;
+    transition: border-color 0.3s ease;
+}
+
+/* Fix for text-muted in dark mode */
+[data-bs-theme="dark"] .text-muted {
+    color: #adb5bd !important;
+}
+
+/* Fix for card styling in dark mode */
+[data-bs-theme="dark"] .card {
+    background-color: var(--secondary-bg);
+    border-color: var(--border-color);
+}
+
+[data-bs-theme="dark"] .card-header {
+    background-color: rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Fix for modal styling in dark mode */
+[data-bs-theme="dark"] .modal-content {
+    background-color: var(--primary-bg);
+    border-color: var(--border-color);
+}
+
+[data-bs-theme="dark"] .modal-header {
+    border-bottom: 1px solid var(--border-color);
+}
+
+[data-bs-theme="dark"] .modal-footer {
+    border-top: 1px solid var(--border-color);
 }
 </style>
 {% endblock %}
