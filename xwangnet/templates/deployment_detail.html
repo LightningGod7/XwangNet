@@ -43,7 +43,7 @@
                     <p>Status: <span id="network-status" class="badge bg-{% if deployment.network_status == 'up' %}success{% else %}danger{% endif %}">
                         {{ deployment.network_status }}
                     </span></p>
-                    <p>Isolated: {{deployment.network.isolated}}</p>
+                    <p>Network is {% if deployment.network.isolated %}isolated{% else %}not isolated{% endif %}</p>
                     <div class="network-actions">
                         <button onclick="toggleNetwork('up')" 
                                 class="btn btn-success" 
