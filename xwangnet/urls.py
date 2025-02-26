@@ -4,7 +4,6 @@ from . import views
 urlpatterns = [
     path('', views.home, name='home'),
     path('containers/', views.container_list, name='container_list'),
-    path('compose-generator/', views.compose_generator, name='compose_generator'),
     path('devices/select/', views.device_selection, name='device_selection'),
     path('network/configure/', views.network_config, name='network_config'),
     path('compose/preview/', views.compose_preview, name='compose_preview'),
