@@ -20,11 +20,24 @@
                     <div class="card shell-card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">Docker Shell</h5>
-                            <span class="badge bg-secondary" id="docker-status">Connecting...</span>
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-sm btn-outline-secondary me-2" id="docker-copy-btn" title="Copy to clipboard">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary me-2" id="docker-clear-btn" title="Clear terminal">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                                <span class="badge bg-secondary" id="docker-status">Connecting...</span>
+                            </div>
                         </div>
                         <div class="card-body p-0">
                             <div id="docker-terminal" class="terminal-container"></div>
                             <div id="docker-error" class="alert alert-danger m-2" style="display: none;"></div>
+                            <div class="terminal-help-text p-1 text-muted small">
+                                <span><kbd>Ctrl</kbd>+<kbd>C</kbd> to copy selection</span>
+                                <span class="mx-2">|</span>
+                                <span><kbd>Right-click</kbd> to paste</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -34,11 +47,24 @@
                     <div class="card shell-card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">QEMU Shell</h5>
-                            <span class="badge bg-secondary" id="qemu-status">Connecting...</span>
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-sm btn-outline-secondary me-2" id="qemu-copy-btn" title="Copy to clipboard">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary me-2" id="qemu-clear-btn" title="Clear terminal">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                                <span class="badge bg-secondary" id="qemu-status">Connecting...</span>
+                            </div>
                         </div>
                         <div class="card-body p-0">
                             <div id="qemu-terminal" class="terminal-container"></div>
                             <div id="qemu-error" class="alert alert-danger m-2" style="display: none;"></div>
+                            <div class="terminal-help-text p-1 text-muted small">
+                                <span><kbd>Ctrl</kbd>+<kbd>C</kbd> to copy selection</span>
+                                <span class="mx-2">|</span>
+                                <span><kbd>Right-click</kbd> to paste</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -48,11 +74,24 @@
                     <div class="card shell-card">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">Chroot Shell</h5>
-                            <span class="badge bg-secondary" id="chroot-status">Connecting...</span>
+                            <div class="d-flex align-items-center">
+                                <button class="btn btn-sm btn-outline-secondary me-2" id="chroot-copy-btn" title="Copy to clipboard">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary me-2" id="chroot-clear-btn" title="Clear terminal">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                                <span class="badge bg-secondary" id="chroot-status">Connecting...</span>
+                            </div>
                         </div>
                         <div class="card-body p-0">
                             <div id="chroot-terminal" class="terminal-container"></div>
                             <div id="chroot-error" class="alert alert-danger m-2" style="display: none;"></div>
+                            <div class="terminal-help-text p-1 text-muted small">
+                                <span><kbd>Ctrl</kbd>+<kbd>C</kbd> to copy selection</span>
+                                <span class="mx-2">|</span>
+                                <span><kbd>Right-click</kbd> to paste</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -63,12 +102,23 @@
 </div>
 
 {% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
 <style>
 .shell-card {
     height: calc(100vh - 100px);
     min-height: 600px;
     display: flex;
     flex-direction: column;
+    border: 1px solid rgba(0, 0, 0, 0.125);
+    border-radius: 0.25rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.shell-card .card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+    padding: 0.75rem 1rem;
 }
 
 .shell-card .card-body {
@@ -83,7 +133,7 @@
     background-color: #1e1e1e;
     flex: 1;
     overflow: hidden;
-    padding: 4px;
+    padding: 0;
     display: flex;
     flex-direction: column;
     position: relative;
@@ -95,74 +145,79 @@
     margin-bottom: 0;
 }
 
-.xterm {
-    height: 100%;
-    flex: 1;
-    display: flex;
-    flex-direction: column;
+.terminal-help-text {
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    text-align: center;
+    font-size: 0.75rem;
+    padding: 0.25rem;
 }
 
-.xterm-viewport {
-    overflow-y: auto !important;
-    flex: 1;
-    background-color: #1e1e1e !important;
+kbd {
+    background-color: #eee;
+    border-radius: 3px;
+    border: 1px solid #b4b4b4;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+    color: #333;
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1;
+    padding: 0.1rem 0.25rem;
+    white-space: nowrap;
 }
 
-.xterm-screen {
-    flex: 1;
-    background-color: #1e1e1e !important;
+/* Toast notification for copy */
+.copy-toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 4px;
+    z-index: 1050;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
 }
 
-/* Hide the textarea but keep it functional */
-.xterm-helper-textarea {
-    position: absolute !important;
-    opacity: 0 !important;
-    left: -9999em !important;
-    top: 0 !important;
-    width: 0 !important;
-    height: 0 !important;
-    z-index: -10 !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    resize: none !important;
-}
-
-/* Ensure xterm-helpers are below text layer */
-.xterm-helpers {
-    position: absolute !important;
-    z-index: 0 !important;
-}
-
-/* Fix text layer to stay within bounds */
-.xterm-text-layer {
-    background-color: #1e1e1e !important;
-    overflow: hidden !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100% !important;
-    height: 100% !important;
-    z-index: 1 !important;
+.copy-toast.show {
+    opacity: 1;
 }
 </style>
 {% endblock %}
 
 {% block extra_js %}
 {% if container.container_id and container.status == 'running' %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/addons/fit/fit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-search@0.13.0/lib/xterm-addon-search.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-serialize@0.11.0/lib/xterm-addon-serialize.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Create toast element for copy notifications
+    const toastEl = document.createElement('div');
+    toastEl.className = 'copy-toast';
+    document.body.appendChild(toastEl);
+    
+    function showToast(message) {
+        toastEl.textContent = message;
+        toastEl.classList.add('show');
+        setTimeout(() => {
+            toastEl.classList.remove('show');
+        }, 2000);
+    }
+    
     function setupTerminal(type) {
+        // Create terminal instance
         const terminal = new Terminal({
             cursorBlink: true,
             fontSize: 14,
             fontFamily: 'Menlo, Monaco, "Courier New", monospace',
             theme: {
                 background: '#1e1e1e',
-                foreground: '#ffffff',
+                foreground: '#f8f8f8',
                 cursor: '#ffffff',
                 cursorAccent: '#000000',
                 selection: 'rgba(255, 255, 255, 0.3)',
@@ -175,40 +230,55 @@ document.addEventListener('DOMContentLoaded', function() {
                 cyan: '#56b6c2',
                 white: '#abb2bf'
             },
-            allowTransparency: true,
-            scrollback: 5000,
-            cols: 100,
-            rows: 40,
+            scrollback: 3000,
             convertEol: true,
             cursorStyle: 'block',
-            windowsMode: false,
-            termName: 'xterm'
+            macOptionIsMeta: true,
+            macOptionClickForcesSelection: true,
+            rightClickSelectsWord: true,
+            altClickMovesCursor: true
         });
         
+        // Get DOM elements
         const terminalElement = document.getElementById(`${type}-terminal`);
         const statusElement = document.getElementById(`${type}-status`);
         const errorElement = document.getElementById(`${type}-error`);
+        const copyButton = document.getElementById(`${type}-copy-btn`);
+        const clearButton = document.getElementById(`${type}-clear-btn`);
         
+        // Create addons
+        const fitAddon = new FitAddon.FitAddon();
+        const webLinksAddon = new WebLinksAddon.WebLinksAddon();
+        const searchAddon = new SearchAddon.SearchAddon();
+        const serializeAddon = new SerializeAddon.SerializeAddon();
+        
+        // Load addons
+        terminal.loadAddon(fitAddon);
+        terminal.loadAddon(webLinksAddon);
+        terminal.loadAddon(searchAddon);
+        terminal.loadAddon(serializeAddon);
+        
+        // Open terminal
         terminal.open(terminalElement);
-        Terminal.applyAddon(fit);
         
-        // Ensure the terminal fits its container
+        // Fit terminal to container
         function fitTerminal() {
             try {
-                terminal.fit();
-                terminal.focus(); // Auto-focus the terminal
+                fitAddon.fit();
+                terminal.focus();
             } catch (e) {
-                console.error('Error fitting terminal:', e);
+                console.error(`Error fitting ${type} terminal:`, e);
             }
         }
         
         // Initial fit
-        setTimeout(fitTerminal, 0);
+        setTimeout(fitTerminal, 100);
         
-        // Connect to WebSocket server
+        // Connect to WebSocket
         const socket = new WebSocket(`ws://${window.location.host}/ws/shell/{{ container.container_id }}/${type}`);
         let isConnected = false;
         
+        // WebSocket event handlers
         socket.onopen = () => {
             console.log(`WebSocket connected for ${type} shell`);
             isConnected = true;
@@ -225,7 +295,7 @@ document.addEventListener('DOMContentLoaded', function() {
             statusElement.className = 'badge bg-danger';
             errorElement.textContent = 'Connection lost. Please refresh the page to reconnect.';
             errorElement.style.display = 'block';
-            terminal.writeln('\n\x1b[1;31m=== Connection Closed ===\x1b[0m');
+            terminal.writeln('\r\n\x1b[1;31m=== Connection Closed ===\x1b[0m');
         };
         
         socket.onerror = (error) => {
@@ -234,75 +304,30 @@ document.addEventListener('DOMContentLoaded', function() {
             statusElement.className = 'badge bg-danger';
             errorElement.textContent = 'Failed to connect to the shell. Please try refreshing the page.';
             errorElement.style.display = 'block';
-            terminal.writeln('\n\x1b[1;31m=== Connection Error ===\x1b[0m');
+            terminal.writeln('\r\n\x1b[1;31m=== Connection Error ===\x1b[0m');
         };
         
         socket.onmessage = (event) => {
-            console.log(`Received data for ${type} shell:`, event.data);
-            terminal.write(event.data);
-            terminal.scrollToBottom();
+            try {
+                terminal.write(event.data);
+            } catch (e) {
+                console.error(`Error writing to ${type} terminal:`, e);
+            }
         };
         
-        let currentLine = '';
-        let currentPosition = 0;
-        
-        // Handle terminal input
+        // Terminal input handling
         terminal.onData(data => {
             if (isConnected && socket.readyState === WebSocket.OPEN) {
-                // Handle special commands first
-                if (data === '\u0003') { // Ctrl+C
-                    currentLine = '';
-                    currentPosition = 0;
+                // Special key handling
+                if (data === '\u0003' && !terminal.hasSelection()) { // Ctrl+C without selection
                     socket.send(JSON.stringify({
                         input: '\u0003',
                         type: 'input'
                     }));
                     return;
                 }
-
-                if (data === 'clear\r' || data === '\u0003c') { // clear command or Ctrl+C followed by c
-                    terminal.clear();
-                    currentLine = '';
-                    currentPosition = 0;
-                    terminal.write('# ');
-                    return;
-                }
-
-                // Handle arrow keys and other special keys
-                if (data.length > 1 && data.startsWith('\x1b')) {
-                    // This is an escape sequence (arrow keys, etc)
-                    socket.send(JSON.stringify({
-                        input: data,
-                        type: 'input'
-                    }));
-                    return;
-                }
-
-                if (data === '\r') { // Enter key
-                    currentLine = '';
-                    currentPosition = 0;
-                    socket.send(JSON.stringify({
-                        input: data,
-                        type: 'input'
-                    }));
-                    return;
-                }
-
-                if (data === '\u007F') { // Backspace
-                    if (currentPosition > 0) {
-                        currentLine = currentLine.slice(0, -1);
-                        currentPosition--;
-                        socket.send(JSON.stringify({
-                            input: '\b',
-                            type: 'input'
-                        }));
-                    }
-                    return;
-                }
-
-                // Regular character input
-                currentLine += data;
-                currentPosition++;
+                
+                // Send input to server
                 socket.send(JSON.stringify({
                     input: data,
                     type: 'input'
@@ -310,20 +335,96 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        // Handle terminal key events
-        terminal.onKey(e => {
-            const ev = e.domEvent;
-            const printable = !ev.altKey && !ev.ctrlKey && !ev.metaKey;
-
-            if (ev.keyCode === 13) { // Enter key
-                terminal.scrollToBottom();
+        // Copy button handler
+        copyButton.addEventListener('click', () => {
+            const content = serializeAddon.serialize();
+            navigator.clipboard.writeText(content)
+                .then(() => {
+                    showToast(`${type} shell content copied to clipboard`);
+                })
+                .catch(err => {
+                    console.error('Failed to copy text: ', err);
+                });
+        });
+        
+        // Clear button handler
+        clearButton.addEventListener('click', () => {
+            terminal.clear();
+        });
+        
+        // Selection copy handler
+        terminal.attachCustomKeyEventHandler(event => {
+            // Handle Ctrl+C for copy when text is selected
+            if (event.ctrlKey && event.key === 'c' && terminal.hasSelection()) {
+                const selection = terminal.getSelection();
+                if (selection) {
+                    navigator.clipboard.writeText(selection)
+                        .then(() => {
+                            showToast('Selection copied to clipboard');
+                        })
+                        .catch(err => {
+                            console.error('Failed to copy selection: ', err);
+                        });
+                }
+                return false; // Don't send to terminal
+            }
+            
+            // Handle Ctrl+V for paste
+            if (event.ctrlKey && event.key === 'v') {
+                navigator.clipboard.readText()
+                    .then(text => {
+                        if (text && isConnected && socket.readyState === WebSocket.OPEN) {
+                            socket.send(JSON.stringify({
+                                input: text,
+                                type: 'input'
+                            }));
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Failed to paste text: ', err);
+                    });
+                return false; // Don't send to terminal
+            }
+            
+            return true; // Pass other events to terminal
+        });
+        
+        // Context menu for right-click operations
+        terminalElement.addEventListener('contextmenu', e => {
+            e.preventDefault();
+            
+            if (terminal.hasSelection()) {
+                // Copy selection
+                const selection = terminal.getSelection();
+                if (selection) {
+                    navigator.clipboard.writeText(selection)
+                        .then(() => {
+                            showToast('Selection copied to clipboard');
+                        })
+                        .catch(err => {
+                            console.error('Failed to copy selection: ', err);
+                        });
+                }
+            } else {
+                // Paste from clipboard
+                navigator.clipboard.readText()
+                    .then(text => {
+                        if (text && isConnected && socket.readyState === WebSocket.OPEN) {
+                            socket.send(JSON.stringify({
+                                input: text,
+                                type: 'input'
+                            }));
+                        }
+                    })
+                    .catch(err => {
+                        console.error('Failed to paste text: ', err);
+                    });
             }
         });
         
-        // Handle terminal resize
+        // Terminal resize handler
         terminal.onResize(size => {
             if (isConnected && socket.readyState === WebSocket.OPEN) {
-                console.log(`Sending resize for ${type} shell:`, size);
                 socket.send(JSON.stringify({
                     type: 'resize',
                     cols: size.cols,
@@ -332,9 +433,10 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
         
-        return { terminal, socket, fitTerminal };
+        return { terminal, socket, fitTerminal, addons: { fitAddon, webLinksAddon, searchAddon, serializeAddon } };
     }
     
+    // Setup all terminals
     const terminals = {
         docker: setupTerminal('docker'),
         qemu: setupTerminal('qemu'),
@@ -357,6 +459,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 socket.close();
             }
         });
+    });
+    
+    // Add keyboard shortcut for switching between terminals
+    document.addEventListener('keydown', e => {
+        // Alt+1, Alt+2, Alt+3 to switch focus between terminals
+        if (e.altKey && e.key >= '1' && e.key <= '3') {
+            const index = parseInt(e.key) - 1;
+            const types = ['docker', 'qemu', 'chroot'];
+            if (index >= 0 && index < types.length) {
+                terminals[types[index]].terminal.focus();
+            }
+        }
     });
 });
 </script>
