@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,6 +13,35 @@
     
     <style>
         /* Custom styles */
+        :root {
+            --primary-bg: #ffffff;
+            --secondary-bg: #f8f9fa;
+            --border-color: #dee2e6;
+            --text-color: #212529;
+            --code-bg: #f8f9fa;
+            --badge-bg-light: #f8f9fa;
+            --badge-text-light: #212529;
+            --badge-status-bg: #e9ecef;
+            --badge-status-text: #212529;
+        }
+        
+        [data-bs-theme="dark"] {
+            --primary-bg: #212529;
+            --secondary-bg: #343a40;
+            --border-color: #495057;
+            --text-color: #f8f9fa;
+            --code-bg: #2b3035;
+            --badge-bg-light: #6c757d;
+            --badge-text-light: #f8f9fa;
+            --badge-status-bg: #6c757d;
+            --badge-status-text: #f8f9fa;
+        }
+        
+        body {
+            background-color: var(--primary-bg);
+            color: var(--text-color);
+        }
+        
         .navbar-brand {
             font-weight: bold;
             font-size: 1.5rem;
@@ -25,8 +54,8 @@
         
         .footer {
             padding: 1rem 0;
-            background-color: #f8f9fa;
-            border-top: 1px solid #dee2e6;
+            background-color: var(--secondary-bg);
+            border-top: 1px solid var(--border-color);
         }
         
         /* Form styling */
@@ -38,10 +67,10 @@
         
         /* Code preview styling */
         pre {
-            background-color: #f8f9fa;
+            background-color: var(--code-bg);
             padding: 1rem;
             border-radius: 4px;
-            border: 1px solid #dee2e6;
+            border: 1px solid var(--border-color);
             overflow-x: auto;
         }
         
@@ -55,6 +84,34 @@
             background-color: #0b5ed7;
             border-color: #0a58ca;
         }
+        
+        /* Badge styling for dark mode */
+        [data-bs-theme="dark"] .badge.bg-light {
+            background-color: var(--badge-bg-light) !important;
+            color: var(--badge-text-light) !important;
+        }
+        
+        /* Status badge styling for better visibility in both modes */
+        .badge.status-badge {
+            background-color: var(--badge-status-bg) !important;
+            color: var(--badge-status-text) !important;
+            border: 1px solid var(--border-color);
+            font-weight: 500;
+        }
+        
+        /* Dark mode toggle */
+        .theme-toggle {
+            cursor: pointer;
+            padding: 5px 10px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .theme-toggle i {
+            font-size: 1.2rem;
+        }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
@@ -67,7 +124,7 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav">
+                <ul class="navbar-nav me-auto">
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'device_selection' %}">Create Network</a>
                     </li>
@@ -84,6 +141,11 @@
                         <a class="nav-link" href="{% url 'upload_firmware' %}">Upload Firmware</a>
                     </li>
                 </ul>
+                <div class="theme-toggle" id="theme-toggle">
+                    <i class="fas fa-sun" id="light-icon"></i>
+                    <i class="fas fa-moon d-none" id="dark-icon"></i>
+                    <span id="theme-text">Dark Mode</span>
+                </div>
             </div>
         </div>
     </nav>
@@ -126,6 +188,51 @@
             `;
             document.querySelector('.main-content').insertBefore(alertDiv, document.querySelector('.main-content').firstChild);
         }
+        
+        // Dark mode toggle functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const themeToggle = document.getElementById('theme-toggle');
+            const lightIcon = document.getElementById('light-icon');
+            const darkIcon = document.getElementById('dark-icon');
+            const themeText = document.getElementById('theme-text');
+            const htmlElement = document.documentElement;
+            
+            // Check for saved theme preference or use default
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            setTheme(savedTheme);
+            
+            // Toggle theme when the button is clicked
+            themeToggle.addEventListener('click', function() {
+                const currentTheme = htmlElement.getAttribute('data-bs-theme');
+                const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+                setTheme(newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
+            
+            function setTheme(theme) {
+                htmlElement.setAttribute('data-bs-theme', theme);
+                
+                if (theme === 'dark') {
+                    lightIcon.classList.add('d-none');
+                    darkIcon.classList.remove('d-none');
+                    themeText.textContent = 'Light Mode';
+                } else {
+                    darkIcon.classList.add('d-none');
+                    lightIcon.classList.remove('d-none');
+                    themeText.textContent = 'Dark Mode';
+                }
+                
+                // Update navbar classes
+                const navbar = document.querySelector('.navbar');
+                if (theme === 'dark') {
+                    navbar.classList.remove('navbar-light', 'bg-light');
+                    navbar.classList.add('navbar-dark', 'bg-dark');
+                } else {
+                    navbar.classList.remove('navbar-dark', 'bg-dark');
+                    navbar.classList.add('navbar-light', 'bg-light');
+                }
+            }
+        });
     </script>
     {% block extra_js %}{% endblock %}
 </body>

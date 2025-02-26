@@ -107,11 +107,11 @@ function generateContainerCard(container) {
                     <h5 class="mb-0">${container.name}</h5>
                     <div>
                         ${container.status === 'running' && container.health_status !== 'No health check' 
-                            ? `<span class="badge bg-light text-dark me-2">
+                            ? `<span class="badge status-badge me-2">
                                 <i class="fas fa-heartbeat"></i> ${container.health_status}
                                </span>`
                             : ''}
-                        <span class="badge bg-light text-dark">${container.status}</span>
+                        <span class="badge status-badge">${container.status}</span>
                     </div>
                 </div>
                 <div class="card-body">
@@ -260,14 +260,16 @@ window.addEventListener('unload', () => {
 
 <style>
 .deployment-title {
-    border-bottom: 2px solid #dee2e6;
+    border-bottom: 2px solid var(--border-color);
     padding-bottom: 0.5rem;
 }
 
 .deployment-section {
-    background-color: #f8f9fa;
+    background-color: var(--secondary-bg);
     padding: 20px;
     border-radius: 8px;
+    border: 1px solid var(--border-color);
+    transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
 .stats-summary .badge {
@@ -277,6 +279,29 @@ window.addEventListener('unload', () => {
 
 .deployment-title .badge {
     margin-left: 10px;
+}
+
+/* Dark mode adjustments for health check and port mapping sections */
+[data-bs-theme="dark"] .health-check-header,
+[data-bs-theme="dark"] .port-mappings-header,
+
+[data-bs-theme="dark"] .health-check-output {
+    background-color: var(--secondary-bg);
+}
+
+[data-bs-theme="dark"] .health-check-content,
+[data-bs-theme="dark"] .port-mappings-content {
+    background-color: var(--primary-bg);
+    border-color: var(--border-color);
+}
+
+[data-bs-theme="dark"] .health-check-item,
+[data-bs-theme="dark"] .port-mapping-item {
+    border-color: var(--border-color);
+}
+
+[data-bs-theme="dark"] .progress {
+    background-color: var(--border-color);
 }
 </style>
 {% endblock %}

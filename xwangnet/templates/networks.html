@@ -46,7 +46,7 @@
                 <td>{{ network.subnet }}</td>
                 <td>{{ network.gateway }}</td>
                 <td>
-                    <span class="{% if network.status == 'active' %}bg-success{% else %}bg-warning{% endif %} badge" 
+                    <span class="badge {% if network.status == 'active' %}bg-success{% else %}bg-warning{% endif %}" 
                           style="color: {% if network.status == 'active' %}white{% else %}#212529{% endif %}">
                         {{ network.status }}
                     </span>
@@ -113,11 +113,19 @@
 </div>
 
 <style>
-.badge.bg-warning {
+[data-bs-theme="light"] .badge.bg-warning {
     color: #212529 !important;
 }
 
-.badge.bg-success {
+[data-bs-theme="light"] .badge.bg-success {
+    color: white !important;
+}
+
+[data-bs-theme="dark"] .badge.bg-warning {
+    color: #212529 !important;
+}
+
+[data-bs-theme="dark"] .badge.bg-success {
     color: white !important;
 }
 
@@ -128,7 +136,7 @@
 
 .network-details-toggle:hover {
     text-decoration: none;
-    color: #0056b3;
+    color: var(--bs-primary);
 }
 
 .network-details-toggle i {
