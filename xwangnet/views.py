@@ -763,15 +763,21 @@ def networks(request):
         ipam_configs = network.attrs.get('IPAM', {}).get('Config', [])
         ipam_config = ipam_configs[0] if ipam_configs else {}
         
-        # Get container information
+        # Get detailed network info including containers
+        network.reload()  # Refresh network data
+        
+        # Get container information from network attributes
         containers = []
-        for container_id, container_attrs in network.attrs.get('Containers', {}).items():
-            containers.append({
+        network_containers = network.attrs.get('Containers', {})
+        
+        for container_id, container_attrs in network_containers.items():
+            container_info = {
                 'id': container_id,
                 'name': container_attrs.get('Name'),
                 'mac_address': container_attrs.get('MacAddress'),
-                'ipv4_address': container_attrs.get('IPv4Address'),
-            })
+                'ipv4_address': container_attrs.get('IPv4Address', '').split('/')[0],  # Remove CIDR notation
+            }
+            containers.append(container_info)
         
         network_info = {
             'id': network.id,
@@ -780,7 +786,7 @@ def networks(request):
             'subnet': ipam_config.get('Subnet', 'N/A'),
             'gateway': ipam_config.get('Gateway', 'N/A'),
             'status': 'active',
-            'container_count': len(network.attrs.get('Containers', {})),
+            'container_count': len(containers),
             'containers': containers,
             'created_at': network.attrs.get('Created'),
             'scope': network.attrs.get('Scope'),
@@ -788,7 +794,7 @@ def networks(request):
             'enable_ipv6': network.attrs.get('EnableIPv6', False),
         }
         networks_data.append(network_info)
-    
+
     # Add planned networks from database
     for network in db_networks:
         if not any(n['name'] == network.name for n in networks_data):

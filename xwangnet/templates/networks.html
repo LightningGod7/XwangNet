@@ -91,6 +91,7 @@
                                             <li>
                                                 <strong>{{ container.name }}</strong>
                                                 <ul>
+                                                    <li>ID: {{ container.id|slice:":12" }}</li>
                                                     <li>IPv4: {{ container.ipv4_address|default:"N/A" }}</li>
                                                     <li>MAC: {{ container.mac_address|default:"N/A" }}</li>
                                                 </ul>
