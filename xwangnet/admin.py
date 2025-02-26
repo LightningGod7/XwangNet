@@ -156,8 +156,8 @@ class DeviceTemplateAdmin(admin.ModelAdmin):
 
 @admin.register(NetworkConfiguration)
 class NetworkConfigurationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'network_type', 'subnet', 'gateway', 'is_active')
-    list_filter = ('network_type', 'is_active')
+    list_display = ('name', 'isolated', 'subnet', 'gateway', 'is_active')
+    list_filter = ('isolated', 'is_active')
     search_fields = ('name',)
 
 @admin.register(Deployment)
@@ -220,7 +220,8 @@ class DeploymentAdmin(admin.ModelAdmin):
             if action == 'up' and deployment.network_status == 'down':
                 network = client.networks.create(
                     deployment.network.name,
-                    driver=deployment.network.network_type,
+                    driver='bridge',
+                    internal=deployment.network.isolated,
                     ipam=docker.types.IPAMConfig(
                         pool_configs=[
                             docker.types.IPAMPool(
@@ -306,7 +307,7 @@ class DeployedContainerAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Container Information', {
-            'fields': ('hostname', 'status', 'container_id', 'created_at')
+            'fields': ('hostname', 'status', 'internal_ip', 'container_id', 'created_at')
         }),
         ('Relationships', {
             'fields': ('deployment', 'device')

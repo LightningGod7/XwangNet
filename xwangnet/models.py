@@ -1,4 +1,6 @@
 from django.db import models
+from xwangnet.services.proxy_manager import ProxyManager
+import json
 
 class DockerNetwork(models.Model):
     name = models.CharField(max_length=255, unique=True)
@@ -51,12 +53,7 @@ class DeviceTemplate(models.Model):
 
 class NetworkConfiguration(models.Model):
     name = models.CharField(max_length=255, unique=True)
-    NETWORK_TYPES = [
-        ('bridge', 'Bridge'),
-        ('host', 'Host-only'),
-    ]
-    
-    network_type = models.CharField(max_length=10, choices=NETWORK_TYPES)
+    isolated = models.BooleanField(default=False)
     subnet = models.CharField(max_length=255, blank=True)
     gateway = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -89,8 +86,9 @@ class DeployedContainer(models.Model):
     device = models.ForeignKey(DeviceTemplate, on_delete=models.CASCADE)
     container_id = models.CharField(max_length=255, null=True, blank=True)
     status = models.CharField(max_length=50, default='stopped')  # running/stopped/error
-    hostname = models.CharField(max_length=255)
+    hostname = models.CharField(max_length=255, null=True, blank=True)  # Added for webtop proxy
     created_at = models.DateTimeField(auto_now_add=True)
+    internal_ip = models.GenericIPAddressField(null=True, blank=True)
 
     def __str__(self):
         return f"{self.deployment.name} - {self.device.name}"

@@ -13,6 +13,12 @@ from django.core.exceptions import ValidationError
 import re
 from concurrent.futures import ThreadPoolExecutor
 import os
+from channels.generic.websocket import AsyncWebsocketConsumer
+import asyncio
+import paramiko
+import docker.errors
+from xwangnet.services.proxy_manager import ProxyManager
+import time
 
 client = docker.from_env()
 
@@ -104,6 +110,7 @@ def container_list_api(request):
                 'health_status': container.attrs.get('State', {}).get('Health', {}).get('Status', 'No health check'),
                 'health_log': container.attrs.get('State', {}).get('Health', {}).get('Log', [])[-3:] if isinstance(container.attrs.get('State', {}).get('Health', {}).get('Log', []), list) else ['No health logs'],
                 'device_name': deployed_container.device.name,
+                'is_isolated': deployment.network.isolated if deployment.network else None,
                 **stats
             }
             containers_data.append(container_info)
@@ -169,7 +176,7 @@ def compose_preview(request):
         'version': '3.9',
         'networks': {
             network.name: {
-                'driver': network.network_type,
+                'driver': 'bridge',
                 'ipam': {
                     'config': [{'subnet': network.subnet, 'gateway': network.gateway}]
                 }
@@ -198,7 +205,6 @@ def compose_preview(request):
     
     yaml_content = yaml.dump(compose_data, default_flow_style=False)
     return render(request, 'compose_preview.html', {
-        'yaml_content': yaml_content,
         'network': network
     })
 
@@ -276,7 +282,8 @@ def deployment_detail(request, deployment_id):
     return render(request, 'deployment_detail.html', {
         'deployment': deployment,
         'deployments': Deployment.objects.all().order_by('-created_at'),
-        'device_templates': DeviceTemplate.objects.all()
+        'device_templates': DeviceTemplate.objects.all(),
+        'monitoring_enabled': deployment.suricata_status == 'active'
     })
 
 def add_containers_to_deployment(request, deployment_id):
@@ -362,7 +369,8 @@ def toggle_network(request, deployment_id):
                 # Check if subnet and gateway are provided
                 network_params = {
                     'name': deployment.network.name,
-                    'driver': deployment.network.network_type,
+                    'driver': 'bridge',
+                    'internal': deployment.network.isolated
                 }
 
                 # Only add IPAM config if both subnet and gateway are provided
@@ -447,23 +455,141 @@ def container_action(request, container_id):
                 detach=True,
                 remove=True
             )
+            docker_container.reload()
             container.container_id = docker_container.id
             container.status = 'running'
+            container.internal_ip = docker_container.attrs['NetworkSettings']['Networks'].get(container.deployment.network.name)['IPAddress']
             container.save()
+
+            if container.deployment.suricata_status == 'active':
+                try:
+                    # Get Suricata IP
+                    suricata_container = client.containers.get(container.deployment.suricata_container_id)
+                    suricata_ip = suricata_container.attrs['NetworkSettings']['Networks'].get(container.deployment.network.name)['IPAddress']
+                    configure_container_routing(docker_container, suricata_ip)
+                except Exception as e:
+                    print(f"Warning: Failed to configure Suricata routing: {str(e)}")
+
+            # Handle webtop proxy if this is a webtop container
+            if container.device.name == 'webtop':
+                # Poll for container to be ready with timeout
+                max_retries = 30  # 30 seconds timeout
+                retry_interval = 1  # 1 second between checks
+                
+                for _ in range(max_retries):
+                    docker_container.reload()  # Refresh container info
+                    if docker_container.status == 'running':
+                        # Check if container is actually responding
+                        try:
+                            # Get container health status if available
+                            health = docker_container.attrs.get('State', {}).get('Health', {}).get('Status')
+                            if health == 'healthy' or health is None:  # None means no health check defined
+                                break
+                        except:
+                            pass
+                    time.sleep(retry_interval)
+                else:  # Loop completed without break - container not ready
+                    raise Exception("Container failed to start within timeout period")
+                
+                docker_container.reload()  # Reload to get fresh container info
+                container_info = docker_container.attrs
+                network_settings = container_info['NetworkSettings']['Networks']
+                network_info = network_settings.get(container.deployment.network.name)
+                
+                if network_info and network_info.get('IPAddress'):  # Make sure we have an IP
+                    hostname = ProxyManager.generate_webtop_hostname()
+                    container_ip = network_info['IPAddress']
+                    
+                    print(f"Container IP: {container_ip}")  # Debug print
+                    
+                    success = ProxyManager.add_webtop_proxy(
+                        hostname,
+                        container_ip,  # This should be a valid IP address
+                        3000  # Webtop default port
+                    )
+                    
+                    if success:
+                        print(f"Successfully added proxy for {hostname} -> {container_ip}:3000")
+                        container.hostname = hostname
+                        container.save()
+                        
+                else:
+                    print(f"Network info: {network_info}")  # Debug print
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': 'Could not get container IP address'
+                    }, status=500)
             
-        elif action in ['stop', 'restart'] and container.container_id:
-            docker_container = client.containers.get(container.container_id)
-            if action == 'stop':
-                docker_container.stop()
-                container.status = 'stopped'
-            else:
+        elif action == 'stop':
+            if container.container_id:
+                try:
+                    docker_container = client.containers.get(container.container_id)
+                    docker_container.stop()
+                except docker.errors.NotFound:
+                    pass
+                    container.status = 'stopped'
+                    
+                # Remove proxy if this is a webtop container
+                if container.device.name == 'webtop' and container.hostname:
+                    ProxyManager.remove_webtop_proxy(container.hostname)
+                
+                container.save()
+                
+        elif action == 'restart':
+            if container.container_id:
+                docker_container = client.containers.get(container.container_id)
                 docker_container.restart()
-            container.save()
+                
+                # Handle webtop proxy reconfiguration if needed
+                if container.device.name == 'webtop':
+                    # Remove old proxy
+                    if container.hostname:
+                        ProxyManager.remove_webtop_proxy(container.hostname)
+                    
+                # Poll for container to be ready with timeout
+                max_retries = 30  # 30 seconds timeout
+                retry_interval = 1  # 1 second between checks
+                
+                for _ in range(max_retries):
+                    docker_container.reload()  # Refresh container info
+                    if docker_container.status == 'running':
+                        # Check if container is actually responding
+                        try:
+                            # Get container health status if available
+                            health = docker_container.attrs.get('State', {}).get('Health', {}).get('Status')
+                            if health == 'healthy' or health is None:  # None means no health check defined
+                                break
+                        except:
+                            pass
+                    time.sleep(retry_interval)
+                else:  # Loop completed without break - container not ready
+                    raise Exception("Container failed to start within timeout period")
+                    
+                    # Add new proxy
+                    container_info = docker_container.attrs
+                    network_settings = container_info['NetworkSettings']['Networks']
+                    network_info = network_settings.get(container.deployment.network.name)
+                    
+                    if network_info:
+                        hostname = ProxyManager.generate_webtop_hostname()
+                        container_ip = network_info['IPAddress']
+                        
+                        success = ProxyManager.add_webtop_proxy(
+                            hostname,
+                            container_ip,
+                            3000
+                        )
+                        
+                        if success:
+                            container.hostname = hostname
+                            container.save()
             
         return JsonResponse({
             'status': 'success', 
             'container_status': container.status,
-            'container_id': container.container_id
+            'container_id': container.container_id,
+            'hostname': container.hostname if container.device.name == 'webtop' else None,
+            'internal_ip': container.internal_ip
         })
     except docker.errors.APIError as e:
         return JsonResponse({
@@ -536,6 +662,10 @@ def delete_deployed_container(request, container_id):
                     docker_container.remove()
                 except docker.errors.NotFound:
                     pass  # Container already removed from Docker
+                
+            # Remove proxy if this is a webtop container
+            if container.device.name == 'webtop' and container.hostname:
+                ProxyManager.remove_webtop_proxy(container.hostname)
                 
             # Delete the DeployedContainer record
             container.delete()
@@ -668,11 +798,12 @@ def networks(request):
             network_info = {
                 'id': f'planned_{network.id}',
                 'name': network.name,
-                'driver': network.network_type,
+                'driver': 'bridge',
                 'subnet': network.subnet,
                 'gateway': network.gateway,
                 'status': 'planned',
-                'container_count': 0
+                'container_count': 0,
+                'internal': network.isolated
             }
             networks_data.append(network_info)
     
@@ -720,7 +851,8 @@ def network_action(request, network_id):
                 
                 network = client.networks.create(
                     name=db_network.name,
-                    driver=db_network.network_type,
+                    driver='bridge',
+                    internal=db_network.isolated,
                     ipam=ipam_config if ipam_config else None
                 )
                 return JsonResponse({'status': 'success', 'message': f'Network {db_network.name} created'})
@@ -795,57 +927,88 @@ def upload_firmware(request):
     return render(request, 'upload_firmware.html')
 
 def deploy_suricata(request, deployment_id):
-    """Deploy Suricata container to monitor a specific deployment network"""
+    """Deploy Suricata as a network gateway"""
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Method not allowed'}, status=405)
 
     deployment = get_object_or_404(Deployment, id=deployment_id)
     
     try:
-        # Get the deployment network interface name
-        deployment_network = client.networks.get(deployment.docker_network_id)
-        network_interface = f"{deployment.docker_network_id[:12]}"  # Docker bridge interface name
-        
-        # Create absolute paths for Suricata volumes
+        # Ensure Suricata directories exist
         base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
         suricata_dir = os.path.join(base_dir, 'suricata')
         
-        # Ensure directories exist
         for dir_name in ['logs']:
             dir_path = os.path.join(suricata_dir, f'{dir_name}-{deployment.id}')
             os.makedirs(dir_path, exist_ok=True)
 
-        # Deploy Suricata container with host networking to monitor bridge interface
+        # Step 1: Get network name from deployment
+        network_name = deployment.network.name
+
+        # Step 2: Deploy Suricata as a Gateway
         suricata_container = client.containers.run(
             "jasonish/suricata:latest",
             name=f"suricata-{deployment.id}",
-            cap_add=["NET_ADMIN", "NET_RAW"],
+            cap_add=["NET_ADMIN", "NET_RAW", "SYS_NICE"],
             volumes={
-                os.path.join(suricata_dir, f'logs-{deployment.id}'): {'bind': '/var/log/suricata', 'mode': 'rw'}
+                os.path.join(suricata_dir, f'logs-{deployment.id}'): {'bind': '/var/log/suricata', 'mode': 'rw'},
+                os.path.join(suricata_dir, 'configs'): {'bind': '/etc/suricata', 'mode': 'rw'}
             },
-            restart_policy={"Name": "unless-stopped"},
-            network_mode="host",  # Use host networking to access bridge interface
+            network=network_name,
+            privileged=True,
             detach=True,
-            command=f"-i br-{network_interface}"  # Add the interface
+            command="-i eth0"
         )
 
-        # Update deployment with Suricata info
+        # Wait for container to be fully started and get its IP
+        max_retries = 30
+        suricata_ip = None
+        
+        for _ in range(max_retries):
+            suricata_container.reload()  # Refresh container info
+            network_settings = suricata_container.attrs.get('NetworkSettings', {}).get('Networks', {})
+            if network_name in network_settings:
+                suricata_ip = network_settings[network_name].get('IPAddress')
+                if suricata_ip:
+                    break
+            time.sleep(0.5)  # Wait 1 second before next try
+
+        if not suricata_ip:
+            raise Exception("Failed to get Suricata container IP address")
+
+        print(f"Suricata IP: {suricata_ip}")
+
+        # Step 3: Configure IP Forwarding & NAT inside Suricata Container
+        suricata_container.exec_run("sysctl -w net.ipv4.ip_forward=1")
+        suricata_container.exec_run("iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE")
+        suricata_container.exec_run("iptables -A FORWARD -i eth0 -j ACCEPT")
+
+        # Step 4: Reconfigure other containers to use Suricata as gateway
+        network = client.networks.get(network_name)
+        for container in network.containers:
+            if container.name != f"suricata-{deployment.id}":
+                print(f"Reconfiguring container: {container.name}")
+                print(f"Container ID: {container.id}")
+                container.reload()  # Refresh container info
+                configure_container_routing(container, suricata_ip)
+
+        # Save Suricata Container ID
         deployment.suricata_container_id = suricata_container.id
         deployment.suricata_status = 'active'
         deployment.save()
 
         return JsonResponse({
             'status': 'success',
-            'message': f'Suricata monitoring activated for deployment {deployment.name}'
+            'message': f'Suricata is now the gateway for {deployment.name}'
         })
 
     except Exception as e:
-        # Clean up if something goes wrong
+        # Cleanup if something goes wrong
         try:
             if 'suricata_container' in locals():
                 suricata_container.remove(force=True)
         except:
-            pass  # Ignore cleanup errors
+            pass
             
         return JsonResponse({
             'status': 'error',
@@ -861,10 +1024,21 @@ def stop_suricata(request, deployment_id):
     
     try:
         if deployment.suricata_container_id:
+            # Reset routing for all containers in the network first
+            network = client.networks.get(deployment.network.name)
+            for container in network.containers:
+                if container.id != deployment.suricata_container_id:
+                    print(f"Resetting routing for container: {container.name}")
+                    container.reload()  # Refresh container info
+                    configure_container_routing(container, restore_default=True)
+
             # Remove Suricata container
-            container = client.containers.get(deployment.suricata_container_id)
-            container.stop()
-            container.remove()
+            try:
+                container = client.containers.get(deployment.suricata_container_id)
+                container.stop()
+                container.remove()
+            except docker.errors.NotFound:
+                pass
 
             # Update deployment
             deployment.suricata_container_id = None
@@ -873,7 +1047,7 @@ def stop_suricata(request, deployment_id):
 
         return JsonResponse({
             'status': 'success',
-            'message': 'Suricata monitoring deactivated'
+            'message': 'Suricata monitoring deactivated and container routing restored'
         })
 
     except Exception as e:
@@ -895,4 +1069,168 @@ def get_suricata_logs(request, deployment_id):
             return JsonResponse({'status': 'error', 'message': 'Suricata not running'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)})
+
+def container_shells(request, container_id):
+    container = get_object_or_404(DeployedContainer, id=container_id)
+    return render(request, 'container_shells.html', {
+        'container': container,
+        'container_id': container.container_id
+    })
+
+def get_monitoring_status(request, deployment_id):
+    """Get monitoring status and statistics"""
+    deployment = get_object_or_404(Deployment, id=deployment_id)
+    
+    try:
+        if not deployment.suricata_container_id:
+            return JsonResponse({
+                'status': 'inactive',
+                'message': 'Monitoring not active'
+            })
+            
+        container = client.containers.get(deployment.suricata_container_id)
+        
+        # Get Suricata stats from eve.json
+        base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+        eve_log = os.path.join(base_dir, 'suricata', f'logs-{deployment.id}', f'eve-{deployment.id}.json')
+        
+        stats = {
+            'container_status': container.status,
+            'alerts': 0,
+            'packets': {
+                'processed': 0,
+                'accepted': 0,
+                'dropped': 0,
+                'failed': 0
+            },
+            'bytes': {
+                'processed': 0
+            },
+            'flows': {
+                'tcp': 0,
+                'udp': 0,
+                'other': 0
+            },
+            'uptime': 0,
+            'last_update': None
+        }
+        
+        if os.path.exists(eve_log):
+            with open(eve_log, 'r') as f:
+                for line in f:
+                    try:
+                        event = json.loads(line)
+                        if event.get('event_type') == 'stats':
+                            # Update packet stats
+                            packets = event.get('stats', {}).get('capture', {}).get('kernel_packets', {})
+                            stats['packets'].update({
+                                'processed': packets.get('received', 0),
+                                'dropped': packets.get('dropped', 0),
+                                'failed': packets.get('failures', 0)
+                            })
+                            
+                            # Update flow stats
+                            flows = event.get('stats', {}).get('flows', {})
+                            stats['flows'].update({
+                                'tcp': flows.get('tcp', 0),
+                                'udp': flows.get('udp', 0),
+                                'other': flows.get('other', 0)
+                            })
+                            
+                            # Update other stats
+                            stats['uptime'] = event.get('stats', {}).get('uptime', 0)
+                            stats['last_update'] = event.get('timestamp', None)
+                            
+                        elif event.get('event_type') == 'alert':
+                            stats['alerts'] += 1
+                            
+                    except:
+                        continue
+        
+        # Get live container logs for additional info
+        logs = container.logs(tail=10).decode('utf-8')
+        stats['recent_logs'] = logs.split('\n')
+        
+        return JsonResponse({
+            'status': 'success',
+            'data': stats
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+def configure_container_routing(container, suricata_ip=None, remove_only=False, restore_default=False):
+    """
+    Configure or remove routing for a container
+    Args:
+        container: Docker container object
+        suricata_ip: IP address of Suricata container (None if removing routes)
+        remove_only: If True, only remove existing routes without adding new ones
+        restore_default: If True, restore default gateway from network config
+    """
+    try:
+        # Get network gateway if we need to restore default
+        if restore_default:
+            network_settings = container.attrs.get('NetworkSettings', {}).get('Networks', {})
+            if network_settings:
+                network_name = list(network_settings.keys())[0]  # Get first network
+                gateway = network_settings[network_name].get('Gateway')
+                if gateway:
+                    suricata_ip = gateway
+                    remove_only = False
+
+        # First, check if the container has ip command
+        ip_check = container.exec_run("which ip")
+        if ip_check.exit_code == 0:
+            # Container has ip command
+            container.exec_run("ip route del default", privileged=True)
+            if not remove_only and suricata_ip:
+                container.exec_run(f"ip route add default via {suricata_ip} dev eth0", privileged=True)
+                # Verify route
+                result = container.exec_run("ip route show default", privileged=True)
+                print(f"Route verification for {container.name}:")
+                print(result.output.decode())
+            return True
+        
+        # Try route command instead
+        route_check = container.exec_run("which route")
+        if route_check.exit_code == 0:
+            container.exec_run("route del default", privileged=True)
+            if not remove_only and suricata_ip:
+                container.exec_run(f"route add default gw {suricata_ip}", privileged=True)
+                # Verify route
+                result = container.exec_run("route -n", privileged=True)
+                print(f"Route verification for {container.name}:")
+                print(result.output.decode())
+            return True
+        
+        if not remove_only and suricata_ip:
+            # If neither command exists, try to install ip command
+            print(f"Installing iproute2 in container {container.name}")
+            try:
+                container.exec_run("apt-get update", privileged=True)
+                container.exec_run("apt-get install -y iproute2", privileged=True)
+            except:
+                try:
+                    container.exec_run("apk add --no-cache iproute2", privileged=True)
+                except:
+                    container.exec_run("yum install -y iproute", privileged=True)
+            
+            # Try again with ip command
+            container.exec_run("ip route del default", privileged=True)
+            container.exec_run(f"ip route add default via {suricata_ip} dev eth0", privileged=True)
+            # Verify route
+            result = container.exec_run("ip route show default", privileged=True)
+            print(f"Route verification for {container.name}:")
+            print(result.output.decode())
+            return True
+            
+        return False
+        
+    except Exception as e:
+        print(f"Warning: Failed to configure routing for container {container.name}: {str(e)}")
+        return False
 

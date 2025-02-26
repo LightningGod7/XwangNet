@@ -1,65 +1,13 @@
-version: '3.9'
-
-networks:
-  host_only_net:
-    driver: bridge
-    internal: true # Ensures the network is isolated and not reachable from outside
-
 services:
-  openwrt_24_10_0:
-    image: vrnetlab/vr-openwrt:24.10.0
-    container_name: openwrt_24_10_0
-    networks:
-      - host_only_net
 
-  openwrt_23_05_5:
-    image: vrnetlab/vr-openwrt:23.05.5
-    container_name: openwrt_23_05_5
-    networks:
-      - host_only_net
-
-  openwrt_22_03_7:
-    image: vrnetlab/vr-openwrt:22.03.7
-    container_name: openwrt_22_03_7
-    networks:
-      - host_only_net
-
-  openwrt_21_02_7:
-    image: vrnetlab/vr-openwrt:21.02.7
-    container_name: openwrt_21_02_7
-    networks:
-      - host_only_net
-
-  openwrt_19_07_9:
-    image: vrnetlab/vr-openwrt:19.07.9
-    container_name: openwrt_19_07_9
-    networks:
-      - host_only_net
-
-  openwrt_18_06_9:
-    image: vrnetlab/vr-openwrt:18.06.9
-    container_name: openwrt_18_06_9
-    networks:
-      - host_only_net
-
-  webtop:
-    image: lscr.io/linuxserver/webtop:latest
-    container_name: webtop
-    security_opt:
-      - seccomp:unconfined #optional
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=Etc/UTC
-      - SUBFOLDER=/ #optional
-      - TITLE=Webtop #optional
+  caddy:
+    image: caddy:2
     volumes:
-      - /path/to/data:/config
-      - /var/run/docker.sock:/var/run/docker.sock #optional
-    ports:
-      - 3000:3000
-      - 3001:3001
-    devices:
-      - /dev/dri:/dev/dri #optional
-    shm_size: "1gb" #optional
-    restart: unless-stopped
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    network_mode: "host"  # This allows Caddy to access all networks
+
+volumes:
+  caddy_data:
+  caddy_config:

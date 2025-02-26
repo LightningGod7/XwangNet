@@ -40,9 +40,10 @@
                 </div>
                 <div class="card-body">
                     <h5>{{ deployment.network.name }}</h5>
-                    <p>Status: <span id="network-status" class="badge bg-{{ deployment.network_status|yesno:'success,danger' }}">
+                    <p>Status: <span id="network-status" class="badge bg-{% if deployment.network_status == 'up' %}success{% else %}danger{% endif %}">
                         {{ deployment.network_status }}
                     </span></p>
+                    <p>Isolated: {{deployment.network.isolated}}</p>
                     <div class="network-actions">
                         <button onclick="toggleNetwork('up')" 
                                 class="btn btn-success" 
@@ -65,7 +66,7 @@
                     Suricata Network Monitoring
                 </div>
                 <div class="card-body">
-                    <p>Status: <span id="suricata-status" class="badge bg-{{ deployment.suricata_status|yesno:'success,danger' }}">
+                    <p>Status: <span id="suricata-status" class="badge bg-{% if deployment.suricata_status == 'active' %}success{% else %}danger{% endif %}">
                         {{ deployment.suricata_status }}
                     </span></p>
                     <div class="suricata-actions">
@@ -161,9 +162,10 @@
                     {% for container in deployment.containers.all %}
                     <div class="container-item mb-4" id="container-{{ container.id }}">
                         <h5>{{ container.hostname }}</h5>
-                        <p>Status: <span class="container-status badge bg-{{ container.status|yesno:'success,danger' }}">
+                        <p>Status: <span class="container-status badge bg-{% if container.status|lower == 'running' %}success{% else %}danger{% endif %}">
                             {{ container.status }}
                         </span></p>
+                        <p id=internal-ip>IP Addr: {{ container.internal_ip }}</p>
                         <div class="d-flex gap-2 mb-2">
                             <div class="btn-group">
                             {% if container.status == 'stopped' %}
@@ -181,6 +183,17 @@
                                     class="btn btn-danger btn-sm">
                                 Stop
                             </button>
+                            <a href="{% url 'container_shells' container.id %}" 
+                               class="btn btn-primary btn-sm">
+                                Access Shells
+                            </a>
+                            {% if container.device.name == 'webtop' and container.status == 'running' and container.hostname %}
+                            <a href="http://{{ container.hostname }}" 
+                                target="_blank" 
+                                class="btn btn-primary btn-sm">
+                                Access Webtop
+                                </a>
+                            {% endif %}
                             {% endif %}
                             </div>
                             <form method="POST" action="{% url 'delete_deployed_container' container.id %}" 
@@ -384,7 +397,7 @@ async function containerAction(containerId, action) {
     const statusSpan = containerDiv.querySelector('.container-status');
     const errorDiv = document.getElementById(`container-error-${containerId}`);
     const logsDiv = document.getElementById(`logs-${containerId}`);
-    
+    const ipPara = containerDiv.querySelector("#internal-ip")
     // Hide previous error
     errorDiv.style.display = 'none';
     
@@ -404,6 +417,7 @@ async function containerAction(containerId, action) {
         const data = await response.json();
         
         if (data.status === 'success') {
+            ipPara.innerHTML = data.internal_ip;
             statusSpan.textContent = data.container_status;
             statusSpan.className = `container-status badge bg-${data.container_status === 'running' ? 'success' : 'danger'}`;
             
