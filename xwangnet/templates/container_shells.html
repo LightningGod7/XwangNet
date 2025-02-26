@@ -127,6 +127,12 @@
     resize: none !important;
 }
 
+/* Ensure xterm-helpers are below text layer */
+.xterm-helpers {
+    position: absolute !important;
+    z-index: 0 !important;
+}
+
 /* Fix text layer to stay within bounds */
 .xterm-text-layer {
     background-color: #1e1e1e !important;
@@ -138,6 +144,7 @@
     bottom: 0 !important;
     width: 100% !important;
     height: 100% !important;
+    z-index: 1 !important;
 }
 </style>
 {% endblock %}
