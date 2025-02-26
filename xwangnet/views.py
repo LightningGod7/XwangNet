@@ -208,9 +208,6 @@ def compose_preview(request):
         'network': network
     })
 
-def compose_generator(request):
-    return render(request, 'compose_generator.html')
-
 def deploy_compose(request):
     if request.method == 'POST':
         try:

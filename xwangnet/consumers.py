@@ -17,8 +17,6 @@ class ShellConsumer(AsyncWebsocketConsumer):
         self.chroot_channel = None
         self.shell_type = None
         self.read_task = None
-        # Get the absolute path to the key file
-        self.key_path = os.path.join(settings.BASE_DIR, 'xwangnet', 'key.pem')
 
     async def connect(self):
         try:
@@ -94,16 +92,19 @@ class ShellConsumer(AsyncWebsocketConsumer):
 
             # Setup SSH client for QEMU
             self.qemu_ssh_client = paramiko.SSHClient()
-            qemu_ssh_key = paramiko.ECDSAKey.from_private_key_file(self.key_path)
             self.qemu_ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             
             try:
                 self.qemu_ssh_client.connect(
                     container_ip,
                     username='root',
-                    pkey=qemu_ssh_key,
+                    password='root',
                     timeout=10
                 )
+            except paramiko.ssh_exception.AuthenticationException:
+                print("Authentication failed")
+                await self.close()
+                return
             except Exception as e:
                 print(f"SSH connection error for QEMU: {str(e)}")
                 await self.close()
@@ -148,16 +149,19 @@ class ShellConsumer(AsyncWebsocketConsumer):
 
             # Setup SSH client for chroot
             self.chroot_ssh_client = paramiko.SSHClient()
-            chroot_ssh_key = paramiko.ECDSAKey.from_private_key_file(self.key_path)
             self.chroot_ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             
             try:
                 self.chroot_ssh_client.connect(
                     container_ip,
                     username='root',
-                    pkey=chroot_ssh_key,
+                    password='root',
                     timeout=10
                 )
+            except paramiko.ssh_exception.AuthenticationException:
+                print("Authentication failed")
+                await self.close()
+                return
             except Exception as e:
                 print(f"SSH connection error for Chroot: {str(e)}")
                 await self.close()
