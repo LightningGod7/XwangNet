@@ -101,6 +101,10 @@ class ShellConsumer(AsyncWebsocketConsumer):
                     password='root',
                     timeout=10
                 )
+            except paramiko.ssh_exception.AuthenticationException:
+                print("Authentication failed")
+                await self.close()
+                return
             except Exception as e:
                 print(f"SSH connection error for QEMU: {str(e)}")
                 await self.close()
@@ -154,6 +158,10 @@ class ShellConsumer(AsyncWebsocketConsumer):
                     password='root',
                     timeout=10
                 )
+            except paramiko.ssh_exception.AuthenticationException:
+                print("Authentication failed")
+                await self.close()
+                return
             except Exception as e:
                 print(f"SSH connection error for Chroot: {str(e)}")
                 await self.close()
