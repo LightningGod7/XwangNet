@@ -126,6 +126,19 @@
     overflow: hidden !important;
     resize: none !important;
 }
+
+/* Fix text layer to stay within bounds */
+.xterm-text-layer {
+    background-color: #1e1e1e !important;
+    overflow: hidden !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+}
 </style>
 {% endblock %}
 
