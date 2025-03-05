@@ -127,13 +127,13 @@ CHANNEL_LAYERS = {
 }
 
 # Add or modify these settings
-CSRF_TRUSTED_ORIGINS = ['http://localhost']
-USE_X_FORWARDED_HOST = True
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# CSRF_TRUSTED_ORIGINS = ['http://localhost']
+# USE_X_FORWARDED_HOST = True
+# SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-CSRF_COOKIE_DOMAIN = 'localhost'
-CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
-CSRF_COOKIE_SAMESITE = 'Lax'
+# CSRF_COOKIE_DOMAIN = 'localhost'
+# CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
+# CSRF_COOKIE_SAMESITE = 'Lax'
 
 LOGGING = {
     'version': 1,
