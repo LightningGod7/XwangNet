@@ -7,7 +7,7 @@ def populate_webtop(sender, **kwargs):
     webtop_image = {
         'name': 'webtop',
         'version': 'latest',
-        'image': "lscr.io/linuxserver/webtop:latest",
+        'image': "webtop:latest",
         'description': 'webtop client',
         'ports': {3000:None}
     }
@@ -20,15 +20,15 @@ def populate_webtop(sender, **kwargs):
             'ports': webtop_image['ports']
         }
     )
-    # Pull if not exist
+    # Build if not exist
     if not created:
         # check if image already in host
-        print(f"pulling {device.image}")
+        print(f"Building {device.image}")
         client = docker.from_env()
         try:
             image = client.images.get(webtop_image['image'])
         except docker.errors.ImageNotFound:
-            image = client.images.pull(device.image)
+            image, _ = client.images.build(path=".", dockerfile="webtop.Dockerfile", tag="webtop:latest")
         print("image", image)
 
 class XwangnetConfig(AppConfig):
