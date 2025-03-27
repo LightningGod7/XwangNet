@@ -171,6 +171,16 @@ class ShellConsumer(AsyncWebsocketConsumer):
             try:
                 self.chroot_channel = self.chroot_ssh_client.invoke_shell(term='xterm')
                 self.chroot_channel.setblocking(0)
+                
+                # Wait for channel to be ready
+                while not self.chroot_channel.recv_ready():
+                    await asyncio.sleep(0.1)
+                # Execute chroot command immediately after connection
+                chroot_cmd = "chroot /root/rootfs /bin/sh -i\n"
+                print(f"Sending chroot command: {chroot_cmd}")
+                self.chroot_channel.send(chroot_cmd)
+                await asyncio.sleep(0.5)  # Wait for command to be processed
+                
             except Exception as e:
                 print(f"Error setting up shell channel: {str(e)}")
                 await self.close()
@@ -294,13 +304,16 @@ class ShellConsumer(AsyncWebsocketConsumer):
 
     async def read_chroot_output(self):
         try:
+            print("Starting chroot output reader")
             while True:
                 if self.chroot_channel and self.chroot_channel.recv_ready():
                     output = self.chroot_channel.recv(1024)
                     if output:
-                        await self.send(text_data=output.decode())
+                        decoded_output = output.decode()
+                        print(f"Received chroot output: {decoded_output}")
+                        await self.send(text_data=decoded_output)
                 await asyncio.sleep(0.01)
 
         except Exception as e:
-            print(f"Error in Chroot output loop: {e}")
+            print(f"Error in Chroot output loop: {str(e)}")
             await self.close() 
