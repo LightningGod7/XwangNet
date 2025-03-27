@@ -12,7 +12,7 @@
             </div>
 
             <div class="row mb-5">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card h-100">
                         <div class="card-body">
                             <h5 class="card-title">Device Management</h5>
@@ -21,21 +21,30 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card h-100">
                         <div class="card-body">
                             <h5 class="card-title">Network Configuration</h5>
-                            <p class="card-text">Create and manage isolated network environments with custom subnet configurations and network types.</p>
+                            <p class="card-text">Create and manage isolated network environments with custom subnet configurations and network types.</p><br>
                             <a href="{% url 'networks' %}" class="btn btn-primary">View Networks</a>
                         </div>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <div class="card h-100">
                         <div class="card-body">
                             <h5 class="card-title">Container Management</h5>
-                            <p class="card-text">Monitor and control your deployed containers with real-time status updates and logs.</p>
+                            <p class="card-text">Monitor your deployed containers with real-time status updates.</p>
                             <a href="{% url 'container_list' %}" class="btn btn-primary">View Containers</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <h5 class="card-title">Deployment Management</h5>
+                            <p class="card-text">control your deployed containers with real-time logs.</p>
+                            <a href="{% url 'deployment_list' %}" class="btn btn-primary">View Deployments</a>
                         </div>
                     </div>
                 </div>
@@ -63,7 +72,6 @@
                             <h3>Features</h3>
                             <ul class="list-unstyled">
                                 <li>✓ Docker-based network isolation</li>
-                                <li>✓ Custom network topology creation</li>
                                 <li>✓ Real-time container monitoring</li>
                                 <li>✓ Pre-configured device templates</li>
                                 <li>✓ Easy deployment and management</li>
