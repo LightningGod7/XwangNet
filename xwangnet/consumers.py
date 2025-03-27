@@ -173,8 +173,8 @@ class ShellConsumer(AsyncWebsocketConsumer):
                 self.chroot_channel.setblocking(0)
                 
                 # Wait for channel to be ready
-                await asyncio.sleep(1)
-                
+                while not self.chroot_channel.recv_ready():
+                    await asyncio.sleep(0.1)
                 # Execute chroot command immediately after connection
                 chroot_cmd = "chroot /root/rootfs /bin/sh -i\n"
                 print(f"Sending chroot command: {chroot_cmd}")
