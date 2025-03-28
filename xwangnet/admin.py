@@ -4,7 +4,7 @@ from django.urls import path, reverse
 from django.shortcuts import redirect, render
 from django.contrib import messages
 import docker
-from .models import DeviceTemplate, NetworkConfiguration, DeviceInstance, Deployment, DeployedContainer
+from .models import DeviceTemplate, NetworkConfiguration, Deployment, DeployedContainer
 
 import docker
 from django.urls import path
