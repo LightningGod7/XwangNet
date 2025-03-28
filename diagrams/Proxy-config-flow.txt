@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant U as User
+    participant D as Django Backend
+    participant PM as ProxyManager
+    participant C as Caddy
+    participant W as Webtop Container
+
+    U->>D: Start webtop container
+    D->>W: Create container
+    D->>W: Wait for healthy status
+    W-->>D: Container ready
+    D->>PM: generate_webtop_hostname()
+    PM-->>D: unique hostname
+    D->>PM: add_webtop_proxy(hostname, ip, port)
+    PM->>C: Configure route
+    C-->>PM: Configuration success
+    PM-->>D: Proxy ready
+    D-->>U: Container URL

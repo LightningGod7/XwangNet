@@ -1,0 +1,46 @@
+erDiagram
+    DeviceTemplate ||--o{ DeployedContainer : "provides template for"
+    DeviceTemplate {
+        string name
+        string image
+        text description
+        string version
+        datetime created_at
+        string docker_id
+        json docker_tags
+        text build_instructions
+        json ports
+        json environment
+    }
+
+    NetworkConfiguration ||--o{ Deployment : "used by"
+    NetworkConfiguration {
+        string name
+        boolean isolated
+        string subnet
+        string gateway
+        datetime created_at
+        boolean is_active
+        string network_type "bridge/host"
+    }
+
+    Deployment ||--o{ DeployedContainer : "contains"
+    Deployment {
+        string name
+        text description
+        datetime created_at
+        string network_status "up/down"
+        string docker_network_id
+        string suricata_container_id
+        string suricata_status "active/inactive"
+    }
+
+    DeployedContainer {
+        string container_id
+        string status "running/stopped/error"
+        string hostname
+        datetime created_at
+        string internal_ip
+        string deployment_id FK
+        string device_id FK
+    }

@@ -1,289 +1,209 @@
 # XWangNet Development Documentation
 
 ## Overview
-XWangNet is a Django-based application for managing Docker networks and containers, specifically designed for network device virtualization.
+XWangNet is a Django-based application for managing Docker networks and containers, specifically designed for network device virtualization with integrated security monitoring through Suricata IDS.
 
-## Models
-
-### DockerNetwork
-Basic network configuration:
-- name: Name of the network
-- subnet: Subnet for the network
-- docker_network_id: ID of the Docker network
-- network_status: Status of the network (up/down)
-- created_at: Date and time when the network was created
-- updated_at: Date and time when the network was last updated
-
+## System Architecture
+```mermaid
+graph TB
+    subgraph "XwangNet System"
+        User[User Browser] -->|Access| Caddy[Caddy Reverse Proxy]
+        Caddy -->|Forward| Webtop[Webtop Container]
+        
+        subgraph "Docker Network"
+            Webtop
+            Suricata[Suricata IDS]
+            OtherContainers[Other Containers]
+        end
+        
+        ProxyManager[Proxy Manager] -->|Configure| Caddy
+        Django[Django Backend] -->|Manage| ProxyManager
+        Django -->|Control| Docker[Docker API]
+        Docker -->|Manage| Webtop
+    end
 ```
-python:xwangnet/models.py
-startLine: 3
-endLine: 9
+
+## Data Model
+```mermaid
+erDiagram
+    DeviceTemplate ||--o{ DeployedContainer : "provides template for"
+    DeviceTemplate {
+        string name
+        string image
+        text description
+        string version
+        datetime created_at
+        string docker_id
+        json docker_tags
+        text build_instructions
+        json ports
+        json environment
+    }
+
+    NetworkConfiguration ||--o{ Deployment : "used by"
+    NetworkConfiguration {
+        string name
+        boolean isolated
+        string subnet
+        string gateway
+        datetime created_at
+        boolean is_active
+        string network_type
+    }
+
+    Deployment ||--o{ DeployedContainer : "contains"
+    Deployment {
+        string name
+        text description
+        datetime created_at
+        string network_status
+        string docker_network_id
+        string suricata_container_id
+        string suricata_status
+    }
+
+    DeployedContainer {
+        string container_id
+        string status
+        string hostname
+        datetime created_at
+        string internal_ip
+        string deployment_id
+        string device_id
+    }
 ```
+
+## Core Components
 
 ### DeviceTemplate
 Template for network devices with Docker configurations:
-- name: Name of the device
-- image: Docker image for the device
-- environment: Environment variables for the device
-- ports: Ports to be exposed for the device
-- created_at: Date and time when the device template was created
-- updated_at: Date and time when the device template was last updated
-
-```python:xwangnet/models.py
-startLine: 21
-endLine: 50
-```
-Key features:
-- Version control for devices
-- Docker image synchronization
-- Port and environment variable management
-- Build instructions storage
+- Name and image management
+- Version control
+- Port and environment configuration
+- Build instruction storage
 
 ### NetworkConfiguration
-Extended network configuration with additional features:
-- Network status (up/down)
-- Docker network ID
-- Network configuration details
-- Deployment history
-- Container management
-- Logs and status updates
-- User-friendly interface for network management
+Network environment settings:
+- Subnet and gateway configuration
+- Isolation controls
+- Network type specification (bridge/host)
+- Active status tracking
 
-```python:xwangnet/models.py
-startLine: 52
-endLine: 63
-```
 ### Deployment
-Represents a complete network deployment:
+Complete network deployment management:
+- Network status tracking
+- Docker network integration
+- Suricata IDS integration
+- Container orchestration
 
+### DeployedContainer
+Individual container instance management:
+- Container lifecycle tracking
+- Hostname and IP management
+- Status monitoring
+- Template association
 
-```python:xwangnet/models.py
-startLine: 74
-endLine: 83
-```
+## Key Features
 
-## Views
-
-### Deployment Management
-
-#### deploy_compose
-Creates new deployments:
-```python:xwangnet/views.py
-startLine: 128
-endLine: 169
-```
-
-Features:
-- Network configuration
-- Device template selection
-- Container creation
-- Error handling
-
-#### deployment_detail
-Shows deployment information and controls:
-```python:xwangnet/views.py
-startLine: 183
-endLine: 188
-```
+### Network Management
+- Isolated network environments
+- Custom subnet configurations
+- Network status monitoring
+- Docker network integration
 
 ### Container Management
-
-#### container_action
-Handles container lifecycle:
-```python:xwangnet/views.py
-startLine: 284
-endLine: 339
-```
-
-Features:
-- Start/Stop/Restart containers
-- Image ID-based deployment
+- Template-based deployment
+- Lifecycle management (start/stop/delete)
+- Status monitoring
 - Automatic cleanup
+
+### Security Features
+- Suricata IDS integration
+- Network traffic monitoring
+- Isolated network environments
 - Status tracking
 
-#### container_logs
-Real-time container log retrieval:
-```python:xwangnet/views.py
-startLine: 341
-endLine: 355
-```
+### Proxy Management
+- Caddy reverse proxy integration
+- Webtop container access
+- Dynamic proxy configuration
+- Hostname-based routing
 
-## Admin Interface
+## API Endpoints
 
-### DeploymentAdmin
-```python:xwangnet/admin.py
-startLine: 98
-endLine: 102
-```
+### Deployment Operations
+- `POST /deployment/create/`: Create new deployment
+- `DELETE /deployment/{id}/`: Remove deployment
+- `POST /deployment/{id}/network/`: Toggle network status
+- `POST /deployment/{id}/deploy-suricata/`: Deploy Suricata IDS
+- `POST /deployment/{id}/stop-suricata/`: Stop Suricata monitoring
 
-Features:
-- Network status management
-- Container deployment controls
-- Filtering and search capabilities
+### Container Operations
+- `POST /container/{id}/action/`: Container lifecycle management
+- `GET /container/{id}/logs/`: Container log retrieval
+- `DELETE /deployed-container/{id}/delete/`: Remove deployed container
+- `GET /container/{id}/buttons/`: Update container controls
 
-## Frontend Components
-
-### Deployment List
-Main deployment overview:
-```html:xwangnet/templates/deployment_list.html
-startLine: 12
-endLine: 51
-```
-
-### Deployment Detail
-Container management interface:
-```html:xwangnet/templates/deployment_detail.html
-startLine: 62
-endLine: 104
-```
+### Network Operations
+- `POST /network/configure/`: Configure network settings
+- `GET /networks/`: List all networks
+- `POST /networks/{id}/action/`: Network actions
 
 ## Development Guidelines
 
 ### Docker Operations
-1. Always use image IDs instead of names:
 ```python
+# Use image IDs for container creation
 image = client.images.get(container.device.image)
-image_id = image.id
-```
-
-2. Enable automatic container cleanup:
-```python
-client.containers.run(
-    image_id,
-    remove=True,  # Equivalent to --rm flag
-    ...
+docker_container = client.containers.run(
+    image.id,
+    name=f"{container.hostname}-{container.id}",
+    hostname=container.hostname,
+    network=deployment.network.name,
+    detach=True,
+    remove=True
 )
 ```
 
 ### Error Handling
-1. Docker API errors:
-```python:xwangnet/views.py
-startLine: 289
-endLine: 299
-```
-
-2. Frontend error display:
-```html:xwangnet/templates/deployment_detail.html
-startLine: 173
-endLine: 179
-```
+- Docker API errors
+- Network configuration issues
+- Container lifecycle errors
+- Proxy configuration failures
 
 ### Status Management
-1. Update container status after operations
-2. Maintain network state consistency
-3. Handle edge cases (already removed containers)
-
-### UI Interactions
-1. Use AJAX for async operations
-2. Show loading states
-3. Display error messages
-4. Update UI elements after successful operations
-
-## API Endpoints
-
-### Container Management
-- POST `/container/{id}/action/`: Container lifecycle management
-- GET `/container/{id}/logs/`: Container log retrieval
-- GET `/container/{id}/buttons/`: Update container control buttons
-
-### Deployment Management
-- POST `/deployment/create/`: Create new deployment
-- DELETE `/deployment/{id}/`: Remove deployment
-- POST `/deployment/{id}/network/`: Toggle network status
-
-### Network Management
-- POST `/network/create/`: Create new network
-  ```python:xwangnet/views.py
-  startLine: 13
-  endLine: 26
-  ```
-  - Parameters:
-    - name: Network name
-    - subnet: Network subnet (e.g., "172.16.0.0/24")
-    - gateway: Network gateway IP
-
-- GET `/network/list/`: List all networks
-  ```python:xwangnet/views.py
-  startLine: 47
-  endLine: 59
-  ```
-  - Returns:
-    - Network details
-    - Connected containers
-    - IP configurations
-    - Network status
-
-### Container Management
-- POST `/container/{id}/action/`: Container lifecycle management
-- GET `/container/{id}/logs/`: Container log retrieval
-- GET `/container/{id}/buttons/`: Update container control buttons
-
-### Deployment Management
-- POST `/deployment/create/`: Create new deployment
-- DELETE `/deployment/{id}/`: Remove deployment
-- POST `/deployment/{id}/network/`: Toggle network status
-
-## Network Operations
-
-### Creating Networks
-
-```python
-client.networks.create(
-name,
-driver="bridge",
-ipam={
-'Config': [
-{'Subnet': subnet, 'Gateway': gateway}
-]
-}
-)
-```
-### Network Status Management
-- Check network existence before creation
-- Handle cleanup on failures
-- Update status in database
-- Maintain consistency with Docker daemon
-
-### Error Handling
-1. Network already exists
-2. Invalid subnet/gateway configuration
-3. Docker daemon connection issues
-4. Permission errors
-5. Resource conflicts
+- Container status tracking
+- Network state consistency
+- Suricata monitoring status
+- Deployment state management
 
 ### Best Practices
-1. Use unique network names
-2. Validate IP ranges before creation
-3. Clean up orphaned networks
-4. Monitor network resource usage
-5. Handle concurrent network operations
+1. Use unique identifiers for all resources
+2. Implement proper cleanup procedures
+3. Validate configurations before deployment
+4. Monitor resource usage
+5. Handle concurrent operations safely
 
 ## Testing Guidelines
+1. Container lifecycle tests
+2. Network isolation verification
+3. Suricata integration tests
+4. Proxy configuration tests
+5. Error handling validation
 
-1. Test Docker operations with non-existent images
-2. Verify cleanup of stopped containers
-3. Check network state consistency
-4. Validate error handling
-5. Test concurrent operations
-
-## Common Issues
-
+## Common Issues and Solutions
 1. Container name conflicts
-   - Solution: Use unique names with IDs
-   - Always enable automatic cleanup
+   - Use unique name generation with IDs
+   - Implement automatic cleanup
 
 2. Network state inconsistency
-   - Check network existence before operations
-   - Handle cleanup on failures
+   - Verify network state before operations
+   - Implement proper cleanup procedures
 
-3. Missing Docker images
-   - Verify image existence before container creation
-   - Provide clear error messages
+3. Proxy configuration issues
+   - Validate hostname configurations
+   - Check Caddy connectivity
 
-## Contributing
-
-1. Follow PEP 8 style guide
-2. Add docstrings for new functions
-3. Update tests for new features
-4. Document API changes
-5. Handle error cases appropriately
+4. Suricata integration
+   - Verify container accessibility
+   - Monitor resource usage

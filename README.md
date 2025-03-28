@@ -1,39 +1,116 @@
-# XwangNet
+# XwangNet (双网 / 仿网)
 
-双网 / 仿网
+Network Digital Twin for Embedded Devices - A platform for creating and managing isolated network environments with security monitoring capabilities.
 
-Network Digital Twin for Embedded Devices
+## Overview
 
-## Milestone 1 (MVP) 17/2/25
+XwangNet is a Django-based application that enables the creation and management of network digital twins. It provides a comprehensive solution for:
 
-Designing System Architecture
+- 🌐 Creating isolated network environments
+- 📦 Managing containerized network devices
+- 🔒 Integrated security monitoring with Suricata IDS
+- 🖥️ Web-based access to network devices via Webtop
+- 🔍 Network traffic analysis and monitoring
 
-1. Collating and Managing Nodes
+## Key Features
 
-2. Create Networking for nodes
+### Network Management
+- Create isolated network environments
+- Custom subnet and gateway configuration
+- Network status monitoring
+- Docker network integration
 
-3. Simple UI / UX
+### Device Management
+- Template-based device deployment
+- Container lifecycle management
+- Web-based device access
+- Automated resource cleanup
 
-## Milestone 2 13/3/25
+### Security Features
+- Integrated Suricata IDS
+- Network traffic monitoring
+- Isolated network environments
+- Security event tracking
 
-Improving Node Management 
+### User Interface
+- Web-based administration
+- Device template management
+- Network configuration interface
+- Deployment monitoring
 
-1. Pipeline for creating nodes
+## Documentation
 
-2. Allowing Remote Connecting into Node Network
-(tailscale or some other VPN)
+- [Installation Guide](Installation.md) - Setup and configuration instructions
+- [Development Documentation](Development.md) - Technical details and API reference
+- [API Documentation](docs/api.md) - REST API endpoints and usage
 
-3. Improve Automation for Node and network creation (UI to select Nodes and network) 
+## Quick Start
 
-## Milestone 3
+1. Install dependencies:
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-1. Allowing SNORT between attacker and network
- - Remote Connection to SIEMs
+2. Start required services:
+```bash
+docker-compose up -d
+```
 
-2. UI to add node's firmware. (Request basis)
+3. Initialize the application:
+```bash
+python3 manage.py migrate
+python3 manage.py createsuperuser
+```
 
-3. 1 Fully Emulated Device
+4. Run the application:
+```bash
+daphne -b 0.0.0.0 -p 8000 xwangnet.asgi:application
+```
 
-4. Automation for Firmware Analysis [TBC]
+For detailed setup instructions, see [Installation Guide](Installation.md).
 
-What other telemetry that can be retrieve from it.
+## Architecture
+
+```mermaid
+graph TB
+    subgraph "XwangNet System"
+        User[User Browser] -->|Access| Caddy[Caddy Reverse Proxy]
+        Caddy -->|Forward| Webtop[Webtop Container]
+        
+        subgraph "Docker Network"
+            Webtop
+            Suricata[Suricata IDS]
+            OtherContainers[Other Containers]
+        end
+        
+        ProxyManager[Proxy Manager] -->|Configure| Caddy
+        Django[Django Backend] -->|Manage| ProxyManager
+        Django -->|Control| Docker[Docker API]
+        Docker -->|Manage| Webtop
+    end
+```
+
+## Current Status
+
+- ✅ Network isolation and management
+- ✅ Container deployment and lifecycle management
+- ✅ Suricata IDS integration
+- ✅ Web-based device access
+- ✅ Basic network monitoring
+- 🚧 Remote network access (VPN integration)
+- 🚧 Firmware analysis automation
+- 🚧 SIEM integration
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
