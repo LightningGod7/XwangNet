@@ -37,7 +37,3 @@ Improving Node Management
 4. Automation for Firmware Analysis [TBC]
 
 What other telemetry that can be retrieve from it.
-
-
-### milestone 69
-TEAM DONT LET ME PR MY EMOOLASHEN SAUCE
