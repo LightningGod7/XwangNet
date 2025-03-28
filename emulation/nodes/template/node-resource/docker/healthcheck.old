@@ -1,0 +1,56 @@
+#!/usr/bin/env python3
+
+import subprocess
+import requests
+import socket
+import sys
+
+def get_docker_ip():
+    """
+    Retrieves the container's IP address.
+    If it fails, returns "127.0.0.1" and prints a warning.
+    """
+    try:
+        result = subprocess.run(["hostname", "-I"], capture_output=True, text=True)
+        ip_address = result.stdout.strip().split()[0]  # Get the first IP
+        if ip_address:
+            return ip_address
+    except Exception as e:
+        print(f"Warning: Failed to retrieve IP address. Error: {e}")
+    
+    print("Warning: Using fallback IP 127.0.0.1")
+    return "127.0.0.1"
+
+def check_web(ip, port):
+    """
+    Sends a GET request to the specified IP and port.
+    Returns True if the response is HTTP 200, otherwise False.
+    """
+    url = f"http://{ip}:{port}"
+    try:
+        response = requests.get(url, timeout=5)  # Timeout to prevent hanging
+        return response.status_code == 200
+    except requests.RequestException:
+        return False
+
+def check_ssh(ip, port):
+    """
+    Attempts to connect to the SSH service on the specified IP and port.
+    Returns True if successful, otherwise False.
+    """
+    try:
+        with socket.create_connection((ip, port), timeout=5) as sock:
+            return True
+    except (socket.timeout, ConnectionRefusedError):
+        return False
+
+if __name__ == "__main__":
+    docker_ip = get_docker_ip()
+
+    web_status = check_web(docker_ip, 80)  # Check web server
+    ssh_status = check_ssh(docker_ip, 22)  # Check SSH server
+
+    if web_status and ssh_status:
+        sys.exit(0)  # Healthy
+    else:
+        sys.exit(1)  # Unhealthy

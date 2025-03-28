@@ -1,0 +1,11 @@
+sudo qemu-system-mips \
+-M malta \
+-kernel kernel \
+-hda image.qcow2 \
+-device virtio-net-pci,netdev=p00,mac=52:54:00:12:12:34 \
+-netdev user,id=p00,hostfwd=tcp::80-:80,hostfwd=tcp::2222-:22 \
+-serial mon:stdio \
+-chardev file,id=logfile,path=/tmp/execv.log \
+-serial chardev:logfile \
+-append "root=/dev/sda1 rw console=ttyS0" \
+-nographic

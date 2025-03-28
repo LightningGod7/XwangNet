@@ -1,0 +1,11 @@
+sudo qemu-system-arm \
+-M versatilepb \
+-kernel kernel \
+-hda image.qcow2 \
+-initrd initrd \
+-net nic -net user,hostfwd=tcp::80-:80,hostfwd=tcp::2222-:22 \
+-serial mon:stdio \
+-chardev file,id=logfile,path=/tmp/execv.log \
+-serial chardev:logfile \
+-append "root=/dev/sda1 rw console=ttyAMA0" \
+-nographic

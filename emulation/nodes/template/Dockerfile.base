@@ -1,0 +1,39 @@
+# Base Image (Template)
+FROM debian:bullseye
+LABEL maintainer="zeuschan0111@gmail.com"
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Update and install common dependencies (excluding qemu-system-*)
+RUN apt-get update -qy \
+ && apt-get upgrade -qy \
+ && apt-get install -y \
+   qemu-kvm \
+   procps \
+   net-tools \
+   iputils-ping \
+   wget \
+   curl \
+   nano \
+   lsof \
+   bridge-utils \
+   iproute2 \
+   python3-ipy \
+   socat \
+   ssh \
+   isc-dhcp-client \
+   uml-utilities \
+   rinetd \
+   iptables \
+   python3-pip \
+ && pip3 install requests \
+ && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+#resolv.conf
+COPY ./resolv /etc/resolv.conf 
+
+# Set up health check (common for all images)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=120s CMD ["/xwangnet/healthcheck.py"]
+
+# Set the entry point (common script location, overridden if necessary)
+ENTRYPOINT ["/xwangnet/start-qemu.py"]

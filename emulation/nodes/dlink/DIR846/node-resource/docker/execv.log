@@ -1,0 +1,706 @@
+
+Process 2526 detached
+[pid  2524] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2524 detached
+[pid  2454] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 1 attached - interrupt to quit
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+Process 156 attached - interrupt to quit
+Process 213 attached - interrupt to quit
+Process 214 attached - interrupt to quit
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+attach: ptrace(PTRACE_ATTACH, ...): Operation not permitted
+Process 1468 attached - interrupt to quit
+Process 1492 attached - interrupt to quit
+Process 1523 attached - interrupt to quit
+Process 1535 attached - interrupt to quit
+Process 1694 attached - interrupt to quit
+Process 1703 attached - interrupt to quit
+Process 1806 attached with 4 threads - interrupt to quit
+Process 1836 attached - interrupt to quit
+Process 1878 attached - interrupt to quit
+attach: ptrace(PTRACE_ATTACH, ...): No such process
+attach: ptrace(PTRACE_ATTACH, ...): No such process
+Process 1940 attached - interrupt to quit
+--- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2380 attached
+Process 2381 attached
+[pid  2381] execve("/bin/ps", ["ps", "-o", "comm=", "-p", "1952"], [/* 15 vars */]) = 0
+Process 2380 suspended
+Process 2380 resumed
+Process 2381 detached
+[pid  2380] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2380 detached
+--- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2382 attached
+Process 2383 attached
+Process 2384 attached
+[pid  2384] execve("/usr/sbin/chroot", ["chroot", "/root/rootfs", "/node-init.sh"], [/* 15 vars */]) = 0
+[pid  2383] execve("/usr/bin/tee", ["tee", "-a", "/var/log/execv.log"], [/* 15 vars */]) = 0
+Process 1940 detached
+[pid  2382] execve("/usr/bin/strace", ["strace", "-ff", "-e", "execve", "-s", "65535", "-p", "1952"], [/* 15 vars */]--- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2385 attached
+[pid  2385] execve("/sbin/startpar", ["startpar", "-f", "--", "node-preinit.sh"], [/* 11 vars */]) = 0
+) = 0
+Process 2386 attached
+[pid  2386] execve("/etc/init.d/ssh", ["/etc/rc2.d/S17ssh", "start"], [/* 13 vars */]) = 0
+[pid  2384] execve("/node-init.sh", ["/node-init.sh"], [/* 15 vars */]) = 0
+Process 2387 attached
+Process 2386 suspended
+Process 2388 attached
+Process 2389 attached
+Process 2387 suspended
+attach: ptrace(PTRACE_ATTACH, ...): No such process
+[pid  2389] execve("/bin/grep", ["grep", "-q", "OpenSSH"], [/* 13 vars */]) = 0
+[pid  2388] execve("/usr/sbin/sshd", ["/usr/sbin/sshd", "-?"], [/* 13 vars */]) = 0
+Process 2382 detached
+Process 2383 detached
+--- SIGCHLD (Child exited) @ 0 (0) ---
+--- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2390 attached
+[pid  2390] execve("/bin/mkdir", ["mkdir", "-p", "/var/run/ubusd"], [/* 15 vars */]) = 0
+Process 2384 suspended
+Process 2384 resumed
+Process 2390 detached
+--- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2391 attached
+Process 2392 attached
+Process 2393 attached
+Process 2394 attached
+[pid  2384] execve("/bin/sh", ["/bin/sh"], [/* 15 vars */] <unfinished ...>
+[pid  2394] execve("/etc/rc.d/S50php7-fastcgi", ["/etc/rc.d/S50php7-fastcgi", "start"], [/* 15 vars */]) = 0
+[pid  2393] execve("/etc/rc.d/S50lighttpd", ["/etc/rc.d/S50lighttpd", "start"], [/* 15 vars */]) = 0
+[pid  2392] execve("/sbin/init", ["/sbin/init"], [/* 15 vars */]) = 0
+[pid  2391] execve("/sbin/ubusd", ["/sbin/ubusd"], [/* 15 vars */] <unfinished ...>
+[pid  2384] <... execve resumed> )      = 0
+[pid  2391] <... execve resumed> )      = 0
+Process 2387 resumed
+Process 2389 detached
+[pid  2387] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2387 suspended
+[pid  2388] --- SIGPIPE (Broken pipe) @ 0 (0) ---
+Process 2387 resumed
+Process 2388 detached
+[pid  2387] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2386 resumed
+Process 2387 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2395 attached
+[pid  2395] execve("/bin/run-parts", ["run-parts", "--lsbsysinit", "--list", "/lib/lsb/init-functions.d"], [/* 13 vars */]) = 0
+Process 2384 detached
+--- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2396 attached
+[pid  2396] execve("/sbin/uci", ["/sbin/uci", "-P", "/var/state", "-S", "-n", "export", "php7-fastcgi"], [/* 15 vars */]) = 0
+Process 2397 attached
+Process 2392 suspended
+[pid  2397] execve("/sbin/kmodloader", ["/sbin/kmodloader", "/etc/modules-boot.d/"], [/* 15 vars */]) = 0
+Process 2398 attached
+Process 2393 suspended
+[pid  2398] execve("/bin/chmod", ["chmod", "0777", "/var/log/lighttpd"], [/* 15 vars */]) = 0
+Process 2395 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2399 attached
+Process 2386 suspended
+[pid  2399] execve("/bin/mkdir", ["mkdir", "/var/run/sshd"], [/* 13 vars */]) = 0
+Process 2392 resumed
+Process 2397 detached
+[pid  2392] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2400 attached
+[pid  2400] execve("/sbin/procd", ["/sbin/procd", "-h", "/etc/hotplug-preinit.json"], [/* 15 vars */]Process 2393 resumed
+Process 2398 detached
+ <unfinished ...>
+[pid  2393] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2401 attached
+Process 2393 suspended
+Process 2402 attached
+[pid  2402] execve("/bin/sh", ["/bin/sh", "/etc/preinit"], [/* 16 vars */]) = 0
+[pid  2401] execve("/sbin/start-stop-daemon", ["start-stop-daemon", "-q", "-S", "-p", "/var/run/lighttpd.pid", "-x", "/usr/sbin/lighttpd", "--", "-f", "/etc/lighttpd/lighttpd.conf"], [/* 15 vars */]) = 0
+[pid  2400] <... execve resumed> )      = 0
+Process 2396 detached
+[pid  2394] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2386 resumed
+Process 2399 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2403 attached
+Process 2386 suspended
+[pid  2403] execve("/bin/chmod", ["chmod", "0755", "/var/run/sshd"], [/* 13 vars */]) = 0
+[pid  2401] execve("/usr/sbin/lighttpd", ["/usr/sbin/lighttpd", "-f", "/etc/lighttpd/lighttpd.conf"], [/* 15 vars */]) = 0
+Process 2404 attached
+Process 2394 suspended
+[pid  2404] execve("/sbin/start-stop-daemon", ["start-stop-daemon", "-q", "-S", "-b", "-m", "-p", "/var/run/php-fcgi.pid", "-x", "/usr/bin/php-fcgi", "--", "-b", "/var/run/php7-fpm.sock"], [/* 15 vars */]) = 0
+Process 2386 resumed
+Process 2403 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2405 attached
+Process 2386 suspended
+[pid  2405] execve("/usr/bin/tput", ["/usr/bin/tput", "hpa", "60"], [/* 13 vars */]) = 0
+Process 2406 attached (waiting for parent)
+Process 2406 resumed (parent 2404 ready)
+Process 2407 attached
+Process 2406 detached
+Process 2394 resumed
+Process 2404 detached
+--- SIGCHLD (Child exited) @ 0 (0) ---
+[pid  2407] execve("/usr/bin/php-fcgi", ["/usr/bin/php-fcgi", "-b", "/var/run/php7-fpm.sock"], [/* 15 vars */]) = 0
+[pid  2394] --- SIGCHLD (Child exited) @ 0 (0) ---
+--- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2394 detached
+Process 2386 resumed
+Process 2405 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2408 attached
+Process 2386 suspended
+[pid  2408] execve("/usr/bin/tput", ["/usr/bin/tput", "setaf", "1"], [/* 13 vars */]) = 0
+Process 2409 attached
+Process 2402 suspended
+[pid  2409] execve("/bin/grep", ["grep", "-q", "failsafe=", "/proc/cmdline"], [/* 16 vars */]) = 0
+Process 2410 attached
+Process 2393 resumed
+Process 2401 detached
+[pid  2393] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2393 detached
+--- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2411 attached
+--- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2410 detached
+Process 2402 resumed
+Process 2409 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2412 attached
+[pid  2412] execve("/bin/mktemp", ["mktemp"], [/* 16 vars */]) = 0
+Process 2386 resumed
+Process 2408 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2413 attached
+Process 2386 suspended
+[pid  2413] execve("/bin/echo", ["/bin/echo", "-n", "[....] "], [/* 13 vars */]) = 0
+Process 2412 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2414 attached
+[pid  2414] execve("/bin/mktemp", ["mktemp"], [/* 16 vars */]) = 0
+Process 2386 resumed
+Process 2413 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2415 attached
+[pid  2415] execve("/bin/echo", ["/bin/echo", "-n", "Starting OpenBSD Secure Shell server: sshd"], [/* 13 vars */]) = 0
+Process 2386 suspended
+Process 2414 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2416 attached
+[pid  2416] execve("/bin/mktemp", ["mktemp"], [/* 16 vars */]) = 0
+Process 2386 resumed
+Process 2415 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2417 attached
+Process 2386 suspended
+[pid  2417] execve("/sbin/start-stop-daemon", ["start-stop-daemon", "--start", "--quiet", "--oknodo", "--pidfile", "/var/run/sshd.pid", "--exec", "/usr/sbin/sshd", "--"], [/* 13 vars */]) = 0
+Process 2416 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2418 attached
+Process 2402 suspended
+[pid  2418] execve("/bin/lock", ["lock", "/tmp/tmp.3Ba1r4"], [/* 16 vars */]) = 0
+[pid  2417] execve("/usr/sbin/sshd", ["/usr/sbin/sshd"], [/* 13 vars */]) = 0
+Process 2419 attached
+Process 2402 resumed
+Process 2418 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2420 attached
+Process 2421 attached
+[pid  2421] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2422 attached
+Process 2420 suspended
+[pid  2422] execve("/bin/sleep", ["sleep", "1"], [/* 16 vars */]) = 0
+Process 2421 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2423 attached
+[pid  2423] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2423 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2424 attached
+[pid  2424] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2424 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2425 attached
+[pid  2425] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2425 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2426 attached
+[pid  2426] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2426 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2427 attached
+[pid  2427] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2427 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2428 attached
+[pid  2428] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2428 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2429 attached
+[pid  2429] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2429 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2430 attached
+[pid  2430] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2430 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2431 attached
+[pid  2431] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2431 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2432 attached
+[pid  2432] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2432 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2433 attached
+[pid  2433] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2434 attached
+Process 2386 resumed
+Process 2417 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2435 attached
+Process 2386 suspended
+[pid  2435] execve("/usr/bin/tput", ["/usr/bin/tput", "hpa", "60"], [/* 13 vars */]) = 0
+Process 2433 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2436 attached
+[pid  2436] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2436 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2437 attached
+[pid  2437] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2437 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2438 attached
+[pid  2438] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2386 resumed
+Process 2435 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2439 attached
+Process 2386 suspended
+[pid  2439] execve("/usr/bin/tput", ["/usr/bin/tput", "setaf", "1"], [/* 13 vars */]) = 0
+Process 2438 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2440 attached
+[pid  2440] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2386 resumed
+Process 2439 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2441 attached
+[pid  2441] execve("/usr/bin/tput", ["/usr/bin/tput", "setaf", "1"], [/* 13 vars */]) = 0
+Process 2440 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2442 attached
+[pid  2442] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2442 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2443 attached
+[pid  2443] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2441 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2443 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2444 attached
+Process 2445 attached
+[pid  2445] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+[pid  2444] execve("/usr/bin/tput", ["/usr/bin/tput", "setaf", "2"], [/* 13 vars */]) = 0
+Process 2445 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2446 attached
+[pid  2446] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2446 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2447 attached
+[pid  2447] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2444 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2448 attached
+[pid  2448] execve("/usr/bin/tput", ["/usr/bin/tput", "setaf", "3"], [/* 13 vars */]) = 0
+Process 2447 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2449 attached
+[pid  2449] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2448 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2450 attached
+Process 2449 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+[pid  2450] execve("/usr/bin/tput", ["/usr/bin/tput", "op"], [/* 13 vars */]) = 0
+Process 2451 attached
+[pid  2451] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2451 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2452 attached
+[pid  2452] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2452 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2453 attached
+Process 2450 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+[pid  2453] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2454 attached
+Process 2386 suspended
+[pid  2454] execve("/usr/bin/tput", ["/usr/bin/tput", "civis"], [/* 13 vars */]) = 0
+Process 2453 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2455 attached
+[pid  2455] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2386 resumed
+Process 2454 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2456 attached
+Process 2386 suspended
+[pid  2456] execve("/usr/bin/tput", ["/usr/bin/tput", "sc"], [/* 13 vars */]) = 0
+Process 2455 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2457 attached
+[pid  2457] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2457 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2458 attached
+[pid  2458] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2458 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2459 attached
+[pid  2459] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2386 resumed
+Process 2456 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2460 attached
+Process 2386 suspended
+[pid  2460] execve("/usr/bin/tput", ["/usr/bin/tput", "hpa", "0"], [/* 13 vars */]) = 0
+Process 2459 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2461 attached
+[pid  2461] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2461 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2462 attached
+[pid  2462] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2386 resumed
+Process 2460 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2463 attached
+Process 2386 suspended
+[pid  2463] execve("/bin/echo", ["/bin/echo", "-ne", "[\33[32m ok \33[39;49m"], [/* 13 vars */]) = 0
+Process 2462 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2464 attached
+[pid  2464] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2420 resumed
+Process 2422 detached
+[pid  2420] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2465 attached
+Process 2420 suspended
+[pid  2465] execve("/bin/sleep", ["sleep", "1"], [/* 16 vars */]) = 0
+Process 2464 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2466 attached
+[pid  2466] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2386 resumed
+Process 2463 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2467 attached
+Process 2386 suspended
+Process 2466 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2468 attached
+[pid  2467] execve("/usr/bin/tput", ["/usr/bin/tput", "rc"], [/* 13 vars */]) = 0
+[pid  2468] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2468 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2469 attached
+[pid  2469] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2469 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2470 attached
+Process 2386 resumed
+Process 2467 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2471 attached
+Process 2386 suspended
+[pid  2470] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+[pid  2471] execve("/usr/bin/tput", ["/usr/bin/tput", "cnorm"], [/* 13 vars */]) = 0
+Process 2470 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2472 attached
+[pid  2472] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2472 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2473 attached
+[pid  2473] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2386 resumed
+Process 2471 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2474 attached
+Process 2386 suspended
+[pid  2474] execve("/usr/bin/tput", ["/usr/bin/tput", "hpa", "60"], [/* 13 vars */]) = 0
+Process 2473 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2475 attached
+[pid  2475] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2475 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2476 attached
+[pid  2476] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2386 resumed
+Process 2474 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2477 attached
+Process 2386 suspended
+[pid  2477] execve("/usr/bin/tput", ["/usr/bin/tput", "setaf", "1"], [/* 13 vars */]) = 0
+Process 2476 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2478 attached
+[pid  2478] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2478 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2479 attached
+[pid  2479] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2386 resumed
+Process 2477 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2480 attached
+[pid  2480] execve("/usr/bin/tput", ["/usr/bin/tput", "setaf", "1"], [/* 13 vars */]) = 0
+Process 2479 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2481 attached
+[pid  2481] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2481 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2482 attached
+[pid  2482] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2480 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2483 attached
+[pid  2483] execve("/usr/bin/tput", ["/usr/bin/tput", "setaf", "3"], [/* 13 vars */]) = 0
+Process 2482 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2484 attached
+[pid  2484] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2484 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2485 attached
+Process 2483 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2486 attached
+[pid  2486] execve("/usr/bin/tput", ["/usr/bin/tput", "op"], [/* 13 vars */]) = 0
+[pid  2485] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2485 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2487 attached
+[pid  2487] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2486 detached
+[pid  2386] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2386 detached
+Process 2487 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2488 attached
+[pid  2488] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+[pid  1703] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2489 attached
+[pid  2489] execve("/etc/init.d/rc.local", ["/etc/rc2.d/S18rc.local", "start"], [/* 13 vars */]) = 0
+Process 2488 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2490 attached
+[pid  2490] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2490 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2491 attached
+[pid  2491] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2491 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2492 attached
+Process 2493 attached
+[pid  2492] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+[pid  2493] execve("/bin/cat", ["cat", "/proc/cmdline"], [/* 13 vars */]) = 0
+Process 2492 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2494 attached
+[pid  2494] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2494 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2495 attached
+[pid  2495] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]Process 2489 suspended
+Process 2489 resumed
+Process 2493 detached
+[pid  2489] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2496 attached
+) = 0
+[pid  2496] execve("/bin/run-parts", ["run-parts", "--lsbsysinit", "--list", "/lib/lsb/init-functions.d"], [/* 13 vars */]) = 0
+Process 2495 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2497 attached
+[pid  2497] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2497 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2498 attached
+[pid  2498] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2496 detached
+[pid  2489] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2499 attached
+Process 2489 suspended
+[pid  2499] execve("/etc/rc.local", ["/etc/rc.local"], [/* 13 vars */]) = 0
+Process 2498 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2500 attached
+[pid  2500] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2500 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2489 resumed
+Process 2499 detached
+[pid  2489] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2501 attached
+Process 2489 detached
+[pid  1703] --- SIGCHLD (Child exited) @ 0 (0) ---
+[pid  2501] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2502 attached
+[pid  2502] execve("/etc/init.d/rmnologin", ["/etc/rc2.d/S18rmnologin", "start"], [/* 13 vars */]) = 0
+Process 2501 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2503 attached
+[pid  2503] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2504 attached
+Process 2503 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2505 attached
+[pid  2505] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+[pid  2504] execve("/bin/cat", ["cat", "/proc/cmdline"], [/* 13 vars */]) = 0
+Process 2505 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2506 attached
+[pid  2506] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2502 suspended
+Process 2502 resumed
+Process 2504 detached
+[pid  2502] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2502 detached
+[pid  1703] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2506 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 1703 detached
+Process 2507 attached
+[pid  2507] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+--- SIGCHLD (Child exited) @ 0 (0) ---
+Process 1694 detached
+--- SIGCHLD (Child exited) @ 0 (0) ---
+--- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2508 attached
+Process 2509 attached
+Process 2510 attached
+Process 2507 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2511 attached
+[pid  2511] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2512 attached (waiting for parent)
+Process 2511 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2513 attached
+[pid  2513] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2420 resumed
+Process 2465 detached
+[pid  2420] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2514 attached
+Process 2420 suspended
+[pid  2514] execve("/bin/lock", ["lock", "-u", "/tmp/tmp.3Ba1r4"], [/* 16 vars */]) = 0
+[pid  2510] execve("/sbin/getty", ["/sbin/getty", "38400", "tty3"], [/* 8 vars */] <unfinished ...>
+[pid  2509] execve("/sbin/getty", ["/sbin/getty", "38400", "tty2"], [/* 8 vars */]) = 0
+Process 2512 resumed (parent 1 ready)
+Process 2515 attached
+Process 2516 attached
+Process 2517 attached
+Process 2513 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2518 attached (waiting for parent)
+Process 2518 resumed (parent 2402 ready)
+[pid  2518] execve("/bin/cat", ["cat", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+[pid  2419] --- SIGTERM (Terminated) @ 0 (0) ---
+Process 2420 resumed
+Process 2419 detached
+Process 2514 detached
+[pid  2420] --- SIGCHLD (Child exited) @ 0 (0) ---
+[pid  2420] execve("/bin/rm", ["rm", "-f", "/tmp/tmp.3Ba1r4"], [/* 16 vars */]) = 0
+[pid  2517] execve("/sbin/getty", ["/sbin/getty", "-L", "ttyS0", "9600", "vt100"], [/* 8 vars */]) = 0
+Process 2420 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2518 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2519 attached
+Process 2402 suspended
+[pid  2519] execve("/bin/lock", ["lock", "-w", "/tmp/tmp.3Ba1r4"], [/* 16 vars */]) = 0
+Process 2520 attached
+Process 2402 resumed
+Process 2519 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2521 attached
+[pid  2521] execve("/bin/cat", ["cat", "/tmp/tmp.W1aGIx"], [/* 16 vars */]Process 2520 detached
+[pid  2516] execve("/sbin/getty", ["/sbin/getty", "38400", "tty6"], [/* 8 vars */]) = 0
+[pid  2510] <... execve resumed> )      = 0
+) = 0
+[pid  2515] execve("/sbin/getty", ["/sbin/getty", "38400", "tty5"], [/* 8 vars */]) = 0
+[pid  2512] execve("/sbin/getty", ["/sbin/getty", "38400", "tty4"], [/* 8 vars */]) = 0
+Process 2521 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2522 attached
+Process 2402 suspended
+[pid  2522] execve("/bin/rm", ["rm", "-f", "/tmp/tmp.W1aGIx"], [/* 16 vars */]) = 0
+[pid  2517] --- SIGWINCH (Window changed) @ 0 (0) ---
+[pid  2508] execve("/sbin/getty", ["/sbin/getty", "38400", "tty1"], [/* 8 vars */]) = 0
+[pid     1] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2402 resumed
+Process 2522 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2523 attached
+Process 2402 suspended
+[pid  2523] execve("/bin/rm", ["rm", "-f", "/tmp/tmp.3Ba1r4"], [/* 16 vars */]) = 0
+Process 2402 resumed
+Process 2523 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2524 attached
+Process 2402 suspended
+[pid  2524] execve("/bin/rm", ["rm", "-f", "/tmp/tmp.8YDZxI"], [/* 16 vars */]) = 0
+Process 2402 resumed
+Process 2524 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2525 attached
+Process 2402 suspended
+[pid  2525] execve("/sbin/mount_root", ["mount_root"], [/* 16 vars */]) = 0
+Process 2402 resumed
+Process 2525 detached
+[pid  2402] --- SIGCHLD (Child exited) @ 0 (0) ---
+Process 2402 detached
+[pid  2392] --- SIGCHLD (Child exited) @ 0 (0) ---
+[pid  2400] +++ killed by SIGKILL +++
+[pid  2392] --- SIGCHLD (Child exited) @ 0 (0) ---
+[pid  2392] execve("/sbin/procd", ["/sbin/procd"], [/* 15 vars */]) = 0
