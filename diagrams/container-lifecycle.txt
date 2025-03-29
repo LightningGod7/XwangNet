@@ -1,0 +1,11 @@
+stateDiagram-v2
+    [*] --> Stopped: Create DeployedContainer
+    Stopped --> Running: container_action(start)
+    Running --> Stopped: container_action(stop)
+    Running --> [*]: delete_deployed_container
+    Stopped --> [*]: delete_deployed_container
+    state Running {
+        [*] --> Active
+        Active --> NetworkConfigured: Configure Network
+        NetworkConfigured --> ProxyConfigured: Configure Proxy (if webtop)
+    }

@@ -1,0 +1,14 @@
+stateDiagram-v2
+    [*] --> Requested
+    Requested --> Starting: container_action('start')
+    Starting --> WaitingForHealth: max 30s timeout
+    WaitingForHealth --> ConfiguringProxy: Container healthy
+    ConfiguringProxy --> Running: Proxy configured
+    Running --> Stopping: container_action('stop')
+    Stopping --> Stopped: Remove proxy
+    Stopped --> [*]
+    
+    note right of WaitingForHealth
+        Polls every 1s for
+        container health status
+    end note
