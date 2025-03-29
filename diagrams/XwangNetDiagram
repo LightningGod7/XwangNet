@@ -1,0 +1,60 @@
+---
+config:
+  theme: redux
+  look: neo
+  layout: dagre
+---
+flowchart TB
+ InfraBreakdown["Xwangnet Infrastructure Breakdown"] --> NodeCreation & NodeManagement & NetworkEngine
+ subgraph Device["Device Preparation"]
+        DeviceFootprint["Device Footprinting"]
+        QEMUemulation["Partial Emulation with QEMU"]
+        KernelInfo["Gather kernel details, architecture, boot processes"]
+        BootQEMU["Boot QEMU with pre-built kernel and disk image"]
+  end
+ subgraph Containerisation["Containerise"]
+        CreateImage["Create Docker image with QEMU binary, scripts, kernel and disk image"]
+        Containers["Containerisation with Docker"]
+        IntFeatures["Integrate Features"]
+        ShellAccess["Shell access via SSH to Docker, QEMU, Chroot"]
+        Telemetry["Telemetry Collection with Strace"]
+        HealthCheck["Health Check with healthcheck.py"]
+  end
+ subgraph NodeCreation["Node Creation"]
+        Device
+        Containerisation
+  end
+    DeviceFootprint --> KernelInfo
+    KernelInfo --> BootQEMU
+    BootQEMU --> QEMUemulation
+    IntFeatures --> ShellAccess & Telemetry & HealthCheck
+    CreateImage --> Containers & IntFeatures
+    Device --> Containerisation
+ subgraph NodeManagement["Node Management"]
+        direction TB
+        WebApp["Web Application for Management"]
+        AdminPanel["Admin Panel for Device and Deployment Management"]
+        CreateNetwork["Create a Deployment"]
+        DeploymentPage["Deployment Page for Node Control"]
+        HealthMonitoring@{ label: "Health Monitoring with Docker's Healthcheck" }
+        WebAccess["WebTop Client for Network Access"]
+        NodeLogs["View Docker Logs"]
+        ShellPage["Control & Access Node"]
+  end
+    WebApp --> AdminPanel & CreateNetwork & DeploymentPage & HealthMonitoring
+    CreateNetwork --> DeploymentPage
+    DeploymentPage --> WebAccess & NodeLogs & ShellPage
+ subgraph NetworkEngine["Network Engine"]
+        direction TB
+        DockerNetwork["Set Gateway, Subnet, Isolate Host"]
+        SuricataProxy["Suricata as Transparent Proxy"]
+        TrafficMonitor["Network Traffic Monitoring"]
+        ConnectNodes["Add Nodes into Network"]
+        RedirectTraffic["Redirect node traffic to Suricata"]
+        LogGeneration["Log generation: fast.log,stats.log, suricata.log"]
+  end
+    DockerNetwork --> ConnectNodes
+    SuricataProxy --> RedirectTraffic
+    RedirectTraffic --> TrafficMonitor
+    ConnectNodes -- Turn on Suricata --> RedirectTraffic
+    TrafficMonitor --> LogGeneration
