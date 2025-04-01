@@ -1028,11 +1028,15 @@ def deploy_suricata(request, deployment_id):
             command="-i eth0"
         )
 
-        #Check if webtop network exists webtop-network-deployment_id
-        webtop_network = client.networks.get(f'webtop-network-{deployment_id}')
-        if webtop_network:
-            webtop_network.connect(suricata_container)
-        # Wait for container to be fully started and get its IP
+        try:
+            #Check if webtop network exists webtop-network-deployment_id
+            webtop_network = ensure_webtop_network(container.deployment.id)
+            webtop_network = client.networks.get(f'webtop-network-{deployment_id}')
+            if webtop_network:
+                webtop_network.connect(suricata_container)
+            # Wait for container to be fully started and get its IP
+        except Exception as e:
+            print(f"Warning: Failed to connect webtop network to Suricata: {str(e)}")
         
         max_retries = 30
         suricata_ip = None
@@ -1065,7 +1069,7 @@ def deploy_suricata(request, deployment_id):
         # Configure NAT for internet access
         suricata_container.exec_run("iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE")
         
-        # Allow forwarding between networks
+        # Allow forwarding between networks 
         suricata_container.exec_run(f"iptables -A FORWARD -s {webtop_network_cidr} -d {deployment_network_cidr} -j ACCEPT")
         suricata_container.exec_run(f"iptables -A FORWARD -s {deployment_network_cidr} -d {webtop_network_cidr} -j ACCEPT")
         
