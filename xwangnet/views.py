@@ -1023,7 +1023,7 @@ def deploy_suricata(request, deployment_id):
                 os.path.join(suricata_dir, 'configs'): {'bind': '/etc/suricata', 'mode': 'rw'}
             },
             network=network_name,
-            privileged=True,
+            #privileged=True,
             detach=True,
             command="-i eth0"
         )
