@@ -1003,13 +1003,15 @@ def deploy_suricata(request, deployment_id):
     deployment = get_object_or_404(Deployment, id=deployment_id)
     
     try:
-        # Ensure Suricata directories exist
+        # Ensure Suricata directories exist with proper permissions
         base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
         suricata_dir = os.path.join(base_dir, 'suricata')
         
         for dir_name in ['logs']:
             dir_path = os.path.join(suricata_dir, f'{dir_name}-{deployment.id}')
             os.makedirs(dir_path, exist_ok=True)
+            # Set permissions that work for both your user and the container
+            os.chmod(dir_path, 0o777)  # Everyone can read/write
 
         # Step 1: Get network name from deployment
         network_name = deployment.network.name
