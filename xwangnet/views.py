@@ -512,6 +512,7 @@ def container_action(request, container_id):
                     if container.device.name == 'webtop':
                         # Get Suricata's IP from webtop network
                         suricata_ip = suricata_container.attrs['NetworkSettings']['Networks'][webtop_network_name]['IPAddress']
+                        configure_container_routing(docker_container, suricata_ip)
                     else:
                         # Get Suricata's IP from deployment network
                         suricata_ip = suricata_container.attrs['NetworkSettings']['Networks'][container.deployment.network.name]['IPAddress']
@@ -1030,11 +1031,12 @@ def deploy_suricata(request, deployment_id):
 
         try:
             #Check if webtop network exists webtop-network-deployment_id
-            webtop_network = ensure_webtop_network(container.deployment.id)
+            webtop_network = ensure_webtop_network(deployment.id)
             webtop_network = client.networks.get(f'webtop-network-{deployment_id}')
             if webtop_network:
                 webtop_network.connect(suricata_container)
-            # Wait for container to be fully started and get its IP
+                # Wait for container to be fully started and get its IP
+                print(f"Webtop network connected to Suricata")
         except Exception as e:
             print(f"Warning: Failed to connect webtop network to Suricata: {str(e)}")
         
