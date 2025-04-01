@@ -1,34 +1,9 @@
 alert http any any -> $HOME_NET any (msg:"ET EXPLOIT D-Link Devices Home Network Administration Protocol Command Execution"; flow:established,to_server; http.method; content:"POST"; http.request_header; header_lowercase; content:"soapaction|3a|"; startswith; content:"http|3a|//purenetworks.com/HNAP1/"; distance:0; fast_pattern; pcre:"/^(?:[^\x2f]+?[\x2f])?[^\x2f]/R"; reference:url,devttys0.com/2015/04/hacking-the-d-link-dir-890l/; reference:cve,2016-6563; classtype:attempted-admin; sid:2020899; rev:6; metadata:created_at 2015_04_13, cve CVE_2016_6563, confidence Medium, signature_severity Major, updated_at 2024_04_20;)
+
 alert http any any -> $HOME_NET any (msg:"mkfifo command detected"; content:"mkfifo /tmp/f"; nocase; sid:100000; rev:1;)
-alert tcp any any -> any any (
-    msg:"POLICY Potential Shell Command - /bin/sh Detected in Network Traffic";
-    content:"/bin/sh";
-    nocase; # Optional: Make the rule case-insensitive
-    classtype:trojan-activity; # Or potentially policy-violation depending on context
-    sid:1000003; # Replace with a unique SID
-    rev:1;
-)
-# D-Link DIR-846 Authenticated RCE via SmartQoS Settings Exploit Detection
-alert http any any -> $HOME_NET 80 (
-    msg:"EXPLOIT Possible D-Link DIR-846 Authenticated RCE attempt via SmartQoS Settings";
-    flow:established,to_server;
-    http.method; content:"POST";
-    http.uri; content:"/HNAP1/";
-    http.header; content:"SOAPAction: \"http://purenetworks.com/HNAP1/SetSmartQoSSettings\"";
-    http.request_body; content:"smartqos_priority_devices";
-    http.request_body; content:"$("; # Detect command injection pattern
-    http.request_body; content:")";
-    reference:url,https://nvd.nist.gov/vuln/detail/CVE-2023-40564; # Example CVE, replace with actual if available or relevant advisory
-    classtype:web-application-attack;
-    sid:1000002; # Replace with a unique SID
-    rev:1;
-)
-# Detect potential reverse shell connection attempt to port 81 (TCP)
-alert tcp $HOME_NET any -> $EXTERNAL_NET 81 (
-    msg:"POLICY - POTENTIAL REVERSE SHELL DETECTED - DST PORT 81";
-    flow:established,to_server;
-    flags:S+,A+; # Syn+Ack flags indicating established connection
-    classtype:trojan-activity; # Or potentially policy-violation depending on context
-    sid:1000004; # Replace with a unique SID
-    rev:1;
-)
+
+alert tcp any any -> any any (msg:"POLICY Potential Shell Command - /bin/sh Detected in Network Traffic"; content:"/bin/sh"; nocase; classtype:trojan-activity; sid:1000003; rev:1;)
+
+alert http any any -> $HOME_NET 80 (msg:"EXPLOIT Possible D-Link DIR-846 Authenticated RCE attempt via SmartQoS Settings"; flow:established,to_server; http.method; content:"POST"; http.uri; content:"/HNAP1/"; http.header; content:"SOAPAction: \"http://purenetworks.com/HNAP1/SetSmartQoSSettings\""; http.request_body; content:"smartqos_priority_devices"; http.request_body; content:"$("; http.request_body; content:")"; reference:url,https://nvd.nist.gov/vuln/detail/CVE-2023-40564; classtype:web-application-attack; sid:1000002; rev:1;)
+
+alert tcp $HOME_NET any -> $EXTERNAL_NET 81 (msg:"POLICY - POTENTIAL REVERSE SHELL DETECTED - DST PORT 81"; flow:established,to_server; flags:S+,A+; classtype:trojan-activity; sid:1000004; rev:1;)
