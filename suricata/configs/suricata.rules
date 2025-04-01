@@ -1,6 +1,6 @@
 alert http any any -> $HOME_NET any (msg:"ET EXPLOIT D-Link Devices Home Network Administration Protocol Command Execution"; flow:established,to_server; http.method; content:"POST"; http.request_header; header_lowercase; content:"soapaction|3a|"; startswith; content:"http|3a|//purenetworks.com/HNAP1/"; distance:0; fast_pattern; pcre:"/^(?:[^\x2f]+?[\x2f])?[^\x2f]/R"; reference:url,devttys0.com/2015/04/hacking-the-d-link-dir-890l/; reference:cve,2016-6563; classtype:attempted-admin; sid:2020899; rev:6; metadata:created_at 2015_04_13, cve CVE_2016_6563, confidence Medium, signature_severity Major, updated_at 2024_04_20;)
 
-alert http any any -> $HOME_NET any (msg:"mkfifo command detected"; content:"mkfifo"; nocase; sid:100000; rev:1;)
+alert http any any -> $HOME_NET any (msg:"mkfifo command detected"; content:"mkfifo /tmp/f"; nocase; sid:100000; rev:1;)
 
 alert tcp any any -> any any (msg:"POLICY Potential Shell Command - /bin/sh Detected in Network Traffic"; content:"/bin/sh"; nocase; classtype:trojan-activity; sid:1000003; rev:1;)
 
