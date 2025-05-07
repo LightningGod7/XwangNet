@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from .models import DockerNetwork, DockerContainer, DeviceTemplate, NetworkConfiguration, DeviceInstance, Deployment, DeployedContainer
-from .forms import DockerNetworkForm, DockerContainerForm, NetworkConfigurationForm, DeviceInstanceForm, ComposeGeneratorForm
+from .models import  DeviceTemplate, NetworkConfiguration, Deployment, DeployedContainer
+from .forms import NetworkConfigurationForm, ComposeGeneratorForm
 import docker
 import yaml
 from django.http import JsonResponse, HttpResponse
@@ -273,6 +273,7 @@ def deployment_detail(request, deployment_id):
     deployment = get_object_or_404(Deployment, id=deployment_id)
     
     if request.method == 'DELETE':
+        cleanup_webtop_network(deployment_id)
         deployment.delete()
         return JsonResponse({'status': 'success', 'message': 'Deployment deleted successfully'})
     
@@ -424,6 +425,33 @@ def toggle_network(request, deployment_id):
             'message': f'Unexpected error: {str(e)}'
         }, status=500)
 
+def ensure_webtop_network(deployment_id):
+    """Ensures the deployment-specific webtop network exists and is properly configured"""
+    webtop_network_name = f'webtop-network-{deployment_id}'
+    try:
+        webtop_network = client.networks.get(webtop_network_name)
+    except docker.errors.NotFound:
+        webtop_network = client.networks.create(
+            webtop_network_name,
+            driver='bridge',
+            internal=False,
+            attachable=True,
+            options={
+                "com.docker.network.bridge.name": f"webtop-br-{deployment_id}",
+                "com.docker.network.bridge.enable_ip_masquerade": "true",
+                "com.docker.network.bridge.enable_icc": "true"
+            },
+            ipam=docker.types.IPAMConfig(
+                pool_configs=[
+                    docker.types.IPAMPool(
+                        subnet=f'172.20.{deployment_id}.0/24',  # Unique subnet per deployment
+                        gateway=f'172.20.{deployment_id}.1'
+                    )
+                ]
+            )
+        )
+    return webtop_network
+
 def container_action(request, container_id):
     container = get_object_or_404(DeployedContainer, id=container_id)
     data = json.loads(request.body)
@@ -441,28 +469,53 @@ def container_action(request, container_id):
                     'message': f'Image {container.device.image} not found'
                 }, status=404)
             
-            # Create container with image ID
+            network_config = {}
+            
+            # Special handling for webtop containers
+            if container.device.name == 'webtop':
+                # Get deployment-specific webtop network
+                webtop_network = ensure_webtop_network(container.deployment.id)
+                webtop_network_name = webtop_network.name
+                
+                # Webtop only connects to webtop network
+                network_config = {
+                    webtop_network_name: None  # None means use default network settings
+                }
+            else:
+                # Non-webtop containers just use the deployment network
+                network_config = {
+                    container.deployment.network.name: None
+                }
+
+            # Create container with network configuration
             docker_container = client.containers.run(
                 image_id,
                 name=f"{container.hostname}-{container.id}",
                 hostname=container.hostname,
-                network=container.deployment.network.name,
+                network=list(network_config.keys())[0],
                 environment=container.device.environment,
                 ports=container.device.ports,
                 detach=True,
                 remove=True
             )
+
             docker_container.reload()
             container.container_id = docker_container.id
             container.status = 'running'
-            container.internal_ip = docker_container.attrs['NetworkSettings']['Networks'].get(container.deployment.network.name)['IPAddress']
+            container.internal_ip = docker_container.attrs['NetworkSettings']['Networks'].get(list(network_config.keys())[0])['IPAddress']
             container.save()
 
             if container.deployment.suricata_status == 'active':
                 try:
-                    # Get Suricata IP
+                    # Get Suricata IP from the appropriate network
                     suricata_container = client.containers.get(container.deployment.suricata_container_id)
-                    suricata_ip = suricata_container.attrs['NetworkSettings']['Networks'].get(container.deployment.network.name)['IPAddress']
+                    if container.device.name == 'webtop':
+                        # Get Suricata's IP from webtop network
+                        suricata_ip = suricata_container.attrs['NetworkSettings']['Networks'][webtop_network_name]['IPAddress']
+                        configure_container_routing(docker_container, suricata_ip)
+                    else:
+                        # Get Suricata's IP from deployment network
+                        suricata_ip = suricata_container.attrs['NetworkSettings']['Networks'][container.deployment.network.name]['IPAddress']
                     configure_container_routing(docker_container, suricata_ip)
                 except Exception as e:
                     print(f"Warning: Failed to configure Suricata routing: {str(e)}")
@@ -491,7 +544,7 @@ def container_action(request, container_id):
                 docker_container.reload()  # Reload to get fresh container info
                 container_info = docker_container.attrs
                 network_settings = container_info['NetworkSettings']['Networks']
-                network_info = network_settings.get(container.deployment.network.name)
+                network_info = network_settings.get(list(network_config.keys())[0])
                 
                 if network_info and network_info.get('IPAddress'):  # Make sure we have an IP
                     hostname = ProxyManager.generate_webtop_hostname()
@@ -521,15 +574,28 @@ def container_action(request, container_id):
             if container.container_id:
                 try:
                     docker_container = client.containers.get(container.container_id)
+                    
+                    # If it's a webtop container, only disconnect from webtop network
+                    if container.device.name == 'webtop':
+                        try:
+                            webtop_network_name = f'webtop-network-{container.deployment.id}'
+                            webtop_network = client.networks.get(webtop_network_name)
+                            webtop_network.disconnect(docker_container)
+                        except docker.errors.NotFound:
+                            pass  # Network might already be gone
+                        except docker.errors.APIError as e:
+                            print(f"Warning: Failed to disconnect from webtop network: {str(e)}")
+                            # Continue with container stop even if network disconnect fails
+
                     docker_container.stop()
+                    
+                    # Remove proxy if this is a webtop container
+                    if container.device.name == 'webtop' and container.hostname:
+                        ProxyManager.remove_webtop_proxy(container.hostname)
+                    
                 except docker.errors.NotFound:
                     pass
-                    container.status = 'stopped'
-                    
-                # Remove proxy if this is a webtop container
-                if container.device.name == 'webtop' and container.hostname:
-                    ProxyManager.remove_webtop_proxy(container.hostname)
-                
+                container.status = 'stopped'
                 container.save()
                 
         elif action == 'restart':
@@ -565,7 +631,7 @@ def container_action(request, container_id):
                     # Add new proxy
                     container_info = docker_container.attrs
                     network_settings = container_info['NetworkSettings']['Networks']
-                    network_info = network_settings.get(container.deployment.network.name)
+                    network_info = network_settings.get(list(network_config.keys())[0])
                     
                     if network_info:
                         hostname = ProxyManager.generate_webtop_hostname()
@@ -937,13 +1003,15 @@ def deploy_suricata(request, deployment_id):
     deployment = get_object_or_404(Deployment, id=deployment_id)
     
     try:
-        # Ensure Suricata directories exist
+        # Ensure Suricata directories exist with proper permissions
         base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
         suricata_dir = os.path.join(base_dir, 'suricata')
         
         for dir_name in ['logs']:
             dir_path = os.path.join(suricata_dir, f'{dir_name}-{deployment.id}')
             os.makedirs(dir_path, exist_ok=True)
+            # Set permissions that work for both your user and the container
+            os.chmod(dir_path, 0o777)  # Everyone can read/write
 
         # Step 1: Get network name from deployment
         network_name = deployment.network.name
@@ -958,12 +1026,22 @@ def deploy_suricata(request, deployment_id):
                 os.path.join(suricata_dir, 'configs'): {'bind': '/etc/suricata', 'mode': 'rw'}
             },
             network=network_name,
-            privileged=True,
+            #privileged=True,
             detach=True,
             command="-i eth0"
         )
 
-        # Wait for container to be fully started and get its IP
+        try:
+            #Check if webtop network exists webtop-network-deployment_id
+            webtop_network = ensure_webtop_network(deployment.id)
+            webtop_network = client.networks.get(f'webtop-network-{deployment_id}')
+            if webtop_network:
+                webtop_network.connect(suricata_container)
+                # Wait for container to be fully started and get its IP
+                print(f"Webtop network connected to Suricata")
+        except Exception as e:
+            print(f"Warning: Failed to connect webtop network to Suricata: {str(e)}")
+        
         max_retries = 30
         suricata_ip = None
         
@@ -981,19 +1059,26 @@ def deploy_suricata(request, deployment_id):
 
         print(f"Suricata IP: {suricata_ip}")
 
-        # Step 3: Configure IP Forwarding & NAT inside Suricata Container
+        # Step 3: Configure NAT and routing in Suricata
         suricata_container.exec_run("sysctl -w net.ipv4.ip_forward=1")
+        
+        # Clear existing rules
+        suricata_container.exec_run("iptables -F")
+        suricata_container.exec_run("iptables -t nat -F")
+        
+        # Get network CIDRs
+        deployment_network_cidr = deployment.network.subnet
+        webtop_network_cidr = f'172.20.{deployment_id}.0/24'
+        
+        # Configure NAT for internet access
         suricata_container.exec_run("iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE")
-        suricata_container.exec_run("iptables -A FORWARD -i eth0 -j ACCEPT")
-
-        # Step 4: Reconfigure other containers to use Suricata as gateway
-        network = client.networks.get(network_name)
-        for container in network.containers:
-            if container.name != f"suricata-{deployment.id}":
-                print(f"Reconfiguring container: {container.name}")
-                print(f"Container ID: {container.id}")
-                container.reload()  # Refresh container info
-                configure_container_routing(container, suricata_ip)
+        
+        # Allow forwarding between networks 
+        suricata_container.exec_run(f"iptables -A FORWARD -s {webtop_network_cidr} -d {deployment_network_cidr} -j ACCEPT")
+        suricata_container.exec_run(f"iptables -A FORWARD -s {deployment_network_cidr} -d {webtop_network_cidr} -j ACCEPT")
+        
+        # Allow return traffic
+        suricata_container.exec_run("iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT")
 
         # Save Suricata Container ID
         deployment.suricata_container_id = suricata_container.id
@@ -1236,4 +1321,14 @@ def configure_container_routing(container, suricata_ip=None, remove_only=False, 
     except Exception as e:
         print(f"Warning: Failed to configure routing for container {container.name}: {str(e)}")
         return False
+
+def cleanup_webtop_network(deployment_id):
+    """Remove the deployment-specific webtop network if it exists"""
+    try:
+        webtop_network = client.networks.get(f'webtop-network-{deployment_id}')
+        webtop_network.remove()
+    except docker.errors.NotFound:
+        pass  # Network doesn't exist or already removed
+    except docker.errors.APIError as e:
+        print(f"Warning: Failed to remove webtop network: {str(e)}")
 

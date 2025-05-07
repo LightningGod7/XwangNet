@@ -2,24 +2,6 @@ from django.db import models
 from xwangnet.services.proxy_manager import ProxyManager
 import json
 
-class DockerNetwork(models.Model):
-    name = models.CharField(max_length=255, unique=True)
-    subnet = models.CharField(max_length=255)
-    gateway = models.CharField(max_length=255)
-
-    def __str__(self):
-        return self.name
-
-class DockerContainer(models.Model):
-    name = models.CharField(max_length=255, unique=True)
-    image = models.CharField(max_length=255)
-    network = models.ForeignKey(DockerNetwork, on_delete=models.CASCADE, related_name='containers')
-    command = models.CharField(max_length=255, blank=True, null=True)
-    environment_vars = models.TextField(blank=True, null=True)
-
-    def __str__(self):
-        return self.name
-
 class DeviceTemplate(models.Model):
     name = models.CharField(max_length=255)
     image = models.CharField(max_length=255)
@@ -58,15 +40,6 @@ class NetworkConfiguration(models.Model):
     gateway = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=False)
-
-class DeviceInstance(models.Model):
-    template = models.ForeignKey(DeviceTemplate, on_delete=models.CASCADE)
-    network = models.ForeignKey(NetworkConfiguration, on_delete=models.CASCADE)
-    hostname = models.CharField(max_length=255)
-    exposed_ports = models.JSONField(default=dict)
-    environment_vars = models.JSONField(default=dict)
-    created_at = models.DateTimeField(auto_now_add=True)
-    status = models.CharField(max_length=50, default='stopped')
 
 class Deployment(models.Model):
     name = models.CharField(max_length=255, unique=True)
