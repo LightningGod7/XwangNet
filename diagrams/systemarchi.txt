@@ -1,0 +1,16 @@
+graph TB
+    subgraph "XwangNet System"
+        User[User Browser] -->|Access| Caddy[Caddy Reverse Proxy]
+        Caddy -->|Forward| Webtop[Webtop Container]
+        
+        subgraph "Docker Network"
+            Webtop
+            Suricata[Suricata IDS]
+            OtherContainers[Other Containers]
+        end
+        
+        ProxyManager[Proxy Manager] -->|Configure| Caddy
+        Django[Django Backend] -->|Manage| ProxyManager
+        Django -->|Control| Docker[Docker API]
+        Docker -->|Manage| Webtop
+    end
