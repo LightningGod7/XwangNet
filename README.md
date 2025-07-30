@@ -66,7 +66,7 @@ python3 manage.py createsuperuser
 
 4. Run the application:
 ```bash
-daphne -b 0.0.0.0 -p 8000 xwangnet.asgi:application
+daphne -b 0.0.0.0 -p 8000 xwangnetapp.asgi:application
 ```
 
 For detailed setup instructions, see [Installation Guide](Installation.md).
