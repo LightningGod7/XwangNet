@@ -208,11 +208,19 @@
                         <div class="logs-section mt-2">
                             <div class="d-flex justify-content-between align-items-center">
                                 <h6 class="mb-0">Logs</h6>
-                                <button onclick="toggleLogs({{ container.id }})" class="btn btn-sm btn-outline-secondary">
-                                    Show/Hide Logs
-                                </button>
+                                <div class="btn-group" role="group">
+                                    <button onclick="toggleLogs({{ container.id }})" class="btn btn-sm btn-outline-secondary">
+                                        Show/Hide Logs
+                                    </button>
+                                    <button onclick="switchLogType({{ container.id }})" class="btn btn-sm btn-outline-primary" id="log-type-btn-{{ container.id }}">
+                                        Default Logs
+                                    </button>
+                                </div>
                             </div>
-                            <pre id="logs-{{ container.id }}" class="container-logs mt-2" style="display: none;"></pre>
+                            <div id="logs-container-{{ container.id }}" style="display: none;">
+                                <pre id="logs-{{ container.id }}" class="container-logs mt-2"></pre>
+                                <div id="logs-warning-{{ container.id }}" class="alert alert-warning alert-sm mt-2" style="display: none;"></div>
+                            </div>
                         </div>
                     </div>
                     {% endfor %}
@@ -346,6 +354,7 @@ function getCookie(name) {
 const csrftoken = getCookie('csrftoken');
 
 let logPollingIntervals = {};
+let logTypes = {}; // Track current log type for each container
 
 async function toggleNetwork(action) {
     const networkStatus = document.getElementById('network-status');
@@ -427,10 +436,16 @@ async function containerAction(containerId, action) {
             // Start or stop log polling based on container status
             if (data.container_status === 'running') {
                 startLogPolling(containerId);
-                logsDiv.style.display = 'block';
+                const logsContainer = document.getElementById(`logs-container-${containerId}`);
+                if (logsContainer) {
+                    logsContainer.style.display = 'block';
+                }
             } else {
                 stopLogPolling(containerId);
-                logsDiv.style.display = 'none';
+                const logsContainer = document.getElementById(`logs-container-${containerId}`);
+                if (logsContainer) {
+                    logsContainer.style.display = 'none';
+                }
             }
         } else {
             throw new Error(data.message);
@@ -451,12 +466,12 @@ async function updateContainerButtons(containerId, status) {
 }
 
 function toggleLogs(containerId) {
-    const logsDiv = document.getElementById(`logs-${containerId}`);
-    if (logsDiv.style.display === 'none') {
-        logsDiv.style.display = 'block';
+    const logsContainer = document.getElementById(`logs-container-${containerId}`);
+    if (logsContainer.style.display === 'none') {
+        logsContainer.style.display = 'block';
         startLogPolling(containerId);
     } else {
-        logsDiv.style.display = 'none';
+        logsContainer.style.display = 'none';
         stopLogPolling(containerId);
     }
 }
@@ -484,14 +499,61 @@ function stopLogPolling(containerId) {
 
 async function fetchLogs(containerId) {
     try {
-        const response = await fetch(`/container/${containerId}/logs/`);
+        const logType = logTypes[containerId] || 'default';
+        const endpoint = logType === 'execv' ? `/container/${containerId}/logs/execv/` : `/container/${containerId}/logs/`;
+        
+        const response = await fetch(endpoint);
         const data = await response.json();
         if (data.logs) {
             const logsDiv = document.getElementById(`logs-${containerId}`);
             logsDiv.textContent = data.logs;
+            
+            // Show warning if there's a warning message
+            if (data.warning) {
+                const warningDiv = document.getElementById(`logs-warning-${containerId}`);
+                if (warningDiv) {
+                    warningDiv.textContent = data.warning;
+                    warningDiv.style.display = 'block';
+                } else {
+                    // Create warning div if it doesn't exist
+                    const newWarningDiv = document.createElement('div');
+                    newWarningDiv.id = `logs-warning-${containerId}`;
+                    newWarningDiv.className = 'alert alert-warning alert-sm mt-2';
+                    newWarningDiv.textContent = data.warning;
+                    logsDiv.parentNode.insertBefore(newWarningDiv, logsDiv);
+                }
+            } else {
+                // Hide warning if no warning message
+                const warningDiv = document.getElementById(`logs-warning-${containerId}`);
+                if (warningDiv) {
+                    warningDiv.style.display = 'none';
+                }
+            }
         }
     } catch (error) {
         console.error('Error fetching logs:', error);
+    }
+}
+
+function switchLogType(containerId) {
+    const currentType = logTypes[containerId] || 'default';
+    const newType = currentType === 'default' ? 'execv' : 'default';
+    
+    // Update the log type
+    logTypes[containerId] = newType;
+    
+    // Update the button text
+    const button = document.getElementById(`log-type-btn-${containerId}`);
+    button.textContent = newType === 'execv' ? 'Execv Logs' : 'Default Logs';
+    button.className = newType === 'execv' ? 'btn btn-sm btn-outline-success' : 'btn btn-sm btn-outline-primary';
+    
+    // Fetch logs with the new type
+    fetchLogs(containerId);
+    
+    // If polling is active, restart it with the new type
+    if (logPollingIntervals[containerId]) {
+        stopLogPolling(containerId);
+        startLogPolling(containerId);
     }
 }
 

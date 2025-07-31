@@ -666,13 +666,104 @@ def container_action(request, container_id):
         }, status=500)
 
 def container_logs(request, container_id):
+    """Get default container logs (stdout/stderr)"""
     container = get_object_or_404(DeployedContainer, id=container_id)
     
     try:
         if container.container_id and container.status == 'running':
             docker_container = client.containers.get(container.container_id)
             logs = docker_container.logs(tail=100).decode('utf-8')
-            return JsonResponse({'status': 'success', 'logs': logs})
+            return JsonResponse({'status': 'success', 'logs': logs, 'type': 'default'})
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Container not running'})
+    except docker.errors.NotFound:
+        return JsonResponse({'status': 'error', 'message': 'Container not found'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
+
+def container_execv_logs(request, container_id):
+    """Get execv logs from /xwangnet/execv.log file"""
+    container = get_object_or_404(DeployedContainer, id=container_id)
+    
+    try:
+        if container.container_id and container.status == 'running':
+            docker_container = client.containers.get(container.container_id)
+            
+            # Hard-coded log file path: /xwangnet/execv.log
+            log_file_path = "/xwangnet/execv.log"
+            
+            # Use exec to tail the specific file inside the container
+            try:
+                # Execute tail command inside the container using sh -c
+                exec_result = docker_container.exec_run(
+                    f'sh -c "tail -n 100 {log_file_path}"',
+                    tty=False
+                )
+                
+                if exec_result.exit_code == 0:
+                    logs = exec_result.output.decode('utf-8')
+                    return JsonResponse({'status': 'success', 'logs': logs, 'type': 'execv'})
+                else:
+                    # If tail fails, fall back to container logs
+                    logs = docker_container.logs(tail=100).decode('utf-8')
+                    return JsonResponse({
+                        'status': 'success', 
+                        'logs': logs,
+                        'type': 'execv',
+                        'warning': f'Could not tail {log_file_path}, showing container logs instead'
+                    })
+                    
+            except Exception as exec_error:
+                # If exec fails, fall back to container logs
+                logs = docker_container.logs(tail=100).decode('utf-8')
+                return JsonResponse({
+                    'status': 'success', 
+                    'logs': logs,
+                    'type': 'execv',
+                    'warning': f'Error tailing file: {str(exec_error)}. Showing container logs instead.'
+                })
+        else:
+            return JsonResponse({'status': 'error', 'message': 'Container not running'})
+    except docker.errors.NotFound:
+        return JsonResponse({'status': 'error', 'message': 'Container not found'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
+
+def container_logs_follow(request, container_id):
+    """Get real-time logs from a specific file inside a container using tail -f"""
+    container = get_object_or_404(DeployedContainer, id=container_id)
+    
+    try:
+        if container.container_id and container.status == 'running':
+            docker_container = client.containers.get(container.container_id)
+            
+            # Hard-coded log file path: /xwangnet/execv.log
+            log_file_path = "/xwangnet/execv.log"
+            
+            # Use exec to tail -f the specific file inside the container
+            try:
+                # Execute tail -f command inside the container using sh -c
+                exec_result = docker_container.exec_run(
+                    f'sh -c "tail -f -n 50 {log_file_path}"',
+                    tty=False,
+                    stream=True
+                )
+                
+                # Stream the output
+                def generate():
+                    for line in exec_result.output:
+                        yield f"data: {line.decode('utf-8')}\n\n"
+                
+                response = HttpResponse(generate(), content_type='text/event-stream')
+                response['Cache-Control'] = 'no-cache'
+                response['X-Accel-Buffering'] = 'no'
+                return response
+                    
+            except Exception as exec_error:
+                return JsonResponse({
+                    'status': 'error', 
+                    'message': f'Error following file: {str(exec_error)}'
+                })
         else:
             return JsonResponse({'status': 'error', 'message': 'Container not running'})
     except docker.errors.NotFound:
