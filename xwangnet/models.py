@@ -13,7 +13,6 @@ class DeviceTemplate(models.Model):
     build_instructions = models.TextField(blank=True, help_text="Instructions for building this device image")
     ports = models.JSONField(default=dict, help_text="Default ports to expose")
     environment = models.JSONField(default=dict, help_text="Default environment variables")
-    log_file_path = models.CharField(max_length=500, blank=True, null=True, help_text="Path to log file inside container to tail (e.g., /var/log/app.log)")
     
     class Meta:
         ordering = ['-created_at']

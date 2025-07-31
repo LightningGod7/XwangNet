@@ -696,7 +696,7 @@ def container_execv_logs(request, container_id):
             try:
                 # Execute tail command inside the container using sh -c
                 exec_result = docker_container.exec_run(
-                    f'sh -c "tail -n 100 {log_file_path}"',
+                    ["tail", "-n", "100", log_file_path],
                     tty=False
                 )
                 
@@ -744,9 +744,8 @@ def container_logs_follow(request, container_id):
             try:
                 # Execute tail -f command inside the container using sh -c
                 exec_result = docker_container.exec_run(
-                    f'sh -c "tail -f -n 50 {log_file_path}"',
-                    tty=False,
-                    stream=True
+                    ["tail", "-n", "100", log_file_path],
+                    tty=False
                 )
                 
                 # Stream the output
