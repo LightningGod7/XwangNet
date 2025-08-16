@@ -103,6 +103,9 @@ graph TB
     end
 ```
 
+## Node Diagram
+![Node diagram](/diagrams/Node%20Diagram.png)
+
 ## Current Status
 
 - ✅ Network isolation and management
