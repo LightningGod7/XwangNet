@@ -19,8 +19,10 @@ import paramiko
 import docker.errors
 from xwangnet.services.proxy_manager import ProxyManager
 import time
+import logging
 
 client = docker.from_env()
+logger = logging.getLogger(__name__)
 
 def network_list(request):
     #networks = DockerNetwork.objects.all()
@@ -144,13 +146,17 @@ def device_selection(request):
             for device_id, count in device_counts.items():
                 device = DeviceTemplate.objects.get(id=device_id)
                 for i in range(count):
+                    device_name = f"{device.name}-{device.version}-{i+1}" if count > 1 else device.name
                     selected_devices.append({
                         'id': device.id,
-                        'name': f"{device.name}-{device.version}-{i+1}",
+                        'name': device_name,
                         'original_name': device.name
                     })
             
+            # Store edge device designation
+            edge_device = request.POST.get('edge_device', '')
             request.session['selected_devices'] = selected_devices
+            request.session['edge_device'] = edge_device
             return redirect('network_config')
     else:
         form = ComposeGeneratorForm()
@@ -161,9 +167,105 @@ def network_config(request):
     if request.method == 'POST':
         form = NetworkConfigurationForm(request.POST)
         if form.is_valid():
-            network = form.save()
+            network = form.save(commit=False)
+            
+            # Handle external IP configuration (non-isolated mode)
+            if not network.isolated:
+                interface_option = request.POST.get('interface_option')
+                
+                # Check if edge device is designated
+                edge_device = request.session.get('edge_device', '')
+                if not edge_device:
+                    messages.warning(request, 'No edge device selected. External IP binding requires an edge device designation.')
+                
+                if interface_option == 'existing':
+                    # Use existing interface
+                    external_interface_json = request.POST.get('external_interface')
+                    port_forwarding = request.POST.get('port_forwarding', '').strip()
+                    
+                    if external_interface_json:
+                        try:
+                            iface_data = json.loads(external_interface_json)
+                            selected_ip = iface_data.get('ip')
+                            
+                            # CRITICAL: Validate against server's IP to prevent SSH/webserver disconnection
+                            from xwangnet.services.interface_manager import InterfaceManager
+                            server_interfaces = InterfaceManager.list_available_interfaces()
+                            server_ips = [iface['ip'] for iface in server_interfaces]
+                            
+                            if selected_ip in server_ips:
+                                # Allow if port forwarding is specified, otherwise block
+                                if not port_forwarding:
+                                    messages.error(
+                                        request, 
+                                        f'❌ CRITICAL: Cannot use server IP {selected_ip} without port forwarding! '
+                                        f'This will disconnect SSH and webserver. Please specify port forwarding or create a new interface.'
+                                    )
+                                    return render(request, 'network_config.html', {'form': form})
+                                else:
+                                    messages.warning(
+                                        request,
+                                        f'⚠️ Using server IP {selected_ip} with port forwarding. Ensure SSH (22) and webserver (8000) ports are not forwarded!'
+                                    )
+                            
+                            network.external_interface = iface_data.get('interface')
+                            network.external_ip = selected_ip
+                            network.use_external_ip = True
+                            network.create_new_interface = False
+                            network.port_forwarding = port_forwarding
+                        except json.JSONDecodeError:
+                            messages.error(request, 'Invalid interface selection')
+                            return render(request, 'network_config.html', {'form': form})
+                    else:
+                        messages.error(request, 'Please select an interface')
+                        return render(request, 'network_config.html', {'form': form})
+                
+                elif interface_option == 'new':
+                    # Create new interface
+                    ip_assignment = request.POST.get('ip_assignment')
+                    network.create_new_interface = True
+                    network.use_external_ip = True
+                    
+                    if ip_assignment == 'dhcp':
+                        network.use_dhcp = True
+                    elif ip_assignment == 'manual':
+                        network.use_dhcp = False
+                        manual_ip = request.POST.get('external_ip')
+                        if manual_ip:
+                            network.external_ip = manual_ip
+                        else:
+                            messages.error(request, 'Manual IP address is required')
+                            return render(request, 'network_config.html', {'form': form})
+            else:
+                # Isolated mode - clear external IP settings
+                network.use_external_ip = False
+                network.create_new_interface = False
+                network.external_interface = None
+                network.external_ip = None
+                
+                # Auto-add webtop for isolated networks
+                try:
+                    webtop_device = DeviceTemplate.objects.filter(name__iexact='webtop').first()
+                    if webtop_device:
+                        selected_devices = request.session.get('selected_devices', [])
+                        # Check if webtop is not already in the list
+                        if not any(d['original_name'].lower() == 'webtop' for d in selected_devices):
+                            selected_devices.append({
+                                'id': webtop_device.id,
+                                'name': 'webtop',
+                                'original_name': 'webtop'
+                            })
+                            request.session['selected_devices'] = selected_devices
+                            print("✓ Auto-added webtop for isolated network")
+                except Exception as e:
+                    print(f"Warning: Failed to auto-add webtop: {str(e)}")
+            
+            network.save()
             request.session['network_id'] = network.id
             return redirect('compose_preview')
+        else:
+            # Form is invalid, show errors
+            messages.error(request, 'Please correct the errors below.')
     else:
         form = NetworkConfigurationForm()
     return render(request, 'network_config.html', {'form': form})
@@ -171,6 +273,7 @@ def network_config(request):
 def compose_preview(request):
     network = NetworkConfiguration.objects.get(id=request.session['network_id'])
     selected_devices = request.session['selected_devices']
+    edge_device = request.session.get('edge_device', '')
     
     compose_data = {
         'version': '3.9',
@@ -205,7 +308,9 @@ def compose_preview(request):
     
     yaml_content = yaml.dump(compose_data, default_flow_style=False)
     return render(request, 'compose_preview.html', {
-        'network': network
+        'network': network,
+        'selected_devices': selected_devices,
+        'edge_device': edge_device
     })
 
 def deploy_compose(request):
@@ -222,6 +327,7 @@ def deploy_compose(request):
             
             network = NetworkConfiguration.objects.get(id=request.session['network_id'])
             selected_devices = request.session['selected_devices']
+            edge_device = request.session.get('edge_device', '')
             
             # Create deployment record
             deployment = Deployment.objects.create(
@@ -239,11 +345,14 @@ def deploy_compose(request):
             # Create container records for each instance
             for device_info in selected_devices:
                 device = device_map[device_info['id']]
+                is_edge = (device_info['name'] == edge_device)
+                
                 DeployedContainer.objects.create(
                     deployment=deployment,
                     device=device,
                     hostname=device_info['name'],
-                    status='stopped'
+                    status='stopped',
+                    is_edge_device=is_edge
                 )
             
             return JsonResponse({
@@ -273,9 +382,93 @@ def deployment_detail(request, deployment_id):
     deployment = get_object_or_404(Deployment, id=deployment_id)
     
     if request.method == 'DELETE':
-        cleanup_webtop_network(deployment_id)
-        deployment.delete()
-        return JsonResponse({'status': 'success', 'message': 'Deployment deleted successfully'})
+        try:
+            # Step 1: Stop all containers in this deployment
+            for container in deployment.containers.all():
+                if container.container_id:
+                    try:
+                        docker_container = client.containers.get(container.container_id)
+                        docker_container.stop(timeout=10)
+                        docker_container.remove()
+                        print(f"✓ Stopped and removed container {container.hostname}")
+                    except docker.errors.NotFound:
+                        print(f"Container {container.hostname} already removed")
+                    except Exception as e:
+                        print(f"Warning: Failed to stop container {container.hostname}: {str(e)}")
+            
+            # Step 2: Stop Suricata container
+            if deployment.suricata_container_id:
+                try:
+                    suricata_container = client.containers.get(deployment.suricata_container_id)
+                    suricata_container.stop(timeout=10)
+                    suricata_container.remove()
+                    print(f"✓ Stopped and removed Suricata container")
+                except docker.errors.NotFound:
+                    print("Suricata container already removed")
+                except Exception as e:
+                    print(f"Warning: Failed to stop Suricata: {str(e)}")
+            
+            # Step 3: Clean up macvlan interface and NAT rules if they exist
+            if deployment.network.use_external_ip and deployment.network.external_interface:
+                from xwangnet.services.interface_manager import InterfaceManager
+                from xwangnet.services.nat_manager import NATManager
+                from xwangnet.models import EdgeDeviceNATRule
+                
+                # Get bridge interface from network ID
+                bridge_interface = NATManager.get_bridge_interface_from_network(deployment.docker_network_id)
+                
+                # Remove all NAT rules for this deployment
+                nat_rules = EdgeDeviceNATRule.objects.filter(deployment=deployment)
+                for rule in nat_rules:
+                    if rule.active and bridge_interface:
+                        NATManager.remove_nat_rules(
+                            src_ip=rule.lan_ip,
+                            dst_ip=rule.internal_ip,
+                            macvlan_interface=rule.macvlan_interface,
+                            bridge_interface=bridge_interface
+                        )
+                        print(f"✓ Removed NAT rules for {rule.lan_ip} → {rule.internal_ip}")
+                    rule.delete()
+                
+                # Release DHCP and delete interface
+                if deployment.network.create_new_interface:
+                    if deployment.network.use_dhcp:
+                        InterfaceManager.release_dhcp_ip(deployment.network.external_interface)
+                    InterfaceManager.delete_interface(deployment.network.external_interface)
+                    print(f"✓ Deleted macvlan interface {deployment.network.external_interface}")
+            
+            # Step 4: Remove Docker networks
+            if deployment.docker_network_id:
+                try:
+                    network = client.networks.get(deployment.docker_network_id)
+                    network.remove()
+                    print(f"✓ Removed Docker network {deployment.network.name}")
+                except docker.errors.NotFound:
+                    print("Docker network already removed")
+                except Exception as e:
+                    print(f"Warning: Failed to remove Docker network: {str(e)}")
+            
+            # Step 5: Clean up webtop network
+            cleanup_webtop_network(deployment_id)
+            
+            # Step 6: Store network reference before deleting deployment
+            network = deployment.network
+            
+            # Step 7: Delete deployment from database
+            deployment.delete()
+            
+            # Step 8: Delete network if no more deployments use it
+            if not network.deployment_set.exists():
+                print(f"✓ No more deployments using network {network.name}, deleting network configuration")
+                network.delete()
+            
+            return JsonResponse({'status': 'success', 'message': 'Deployment deleted successfully'})
+            
+        except Exception as e:
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Failed to delete deployment: {str(e)}'
+            }, status=500)
     
     return render(request, 'deployment_detail.html', {
         'deployment': deployment,
@@ -388,6 +581,79 @@ def toggle_network(request, deployment_id):
                 deployment.network_status = 'up'
                 deployment.save()
                 
+                # Inspect the network to get the actual subnet assigned by Docker
+                network.reload()
+                if network.attrs.get('IPAM') and network.attrs['IPAM'].get('Config'):
+                    ipam_config = network.attrs['IPAM']['Config']
+                    if ipam_config and len(ipam_config) > 0:
+                        actual_subnet = ipam_config[0].get('Subnet')
+                        actual_gateway = ipam_config[0].get('Gateway')
+                        
+                        # Update the network configuration if subnet was not set
+                        if not deployment.network.subnet and actual_subnet:
+                            deployment.network.subnet = actual_subnet
+                            deployment.network.gateway = actual_gateway
+                            deployment.network.save()
+                            print(f"✓ Populated network subnet: {actual_subnet}, gateway: {actual_gateway}")
+                
+                # NEW: Create macvlan interface and configure external IP if needed
+                if deployment.network.use_external_ip and deployment.network.create_new_interface:
+                    try:
+                        from xwangnet.services.interface_manager import InterfaceManager
+                        
+                        # Find the edge device to name the interface after it
+                        edge_device = deployment.containers.filter(is_edge_device=True).first()
+                        if edge_device:
+                            # Clean device name for interface (remove spaces, special chars)
+                            clean_name = re.sub(r'[^a-z0-9]', '', edge_device.device.name.lower())
+                            interface_name = clean_name[:15]  # Limit to 15 chars for interface name
+                            logger.info(f"Creating interface named after edge device: {interface_name}")
+                        else:
+                            # Fallback to auto-generated name if no edge device found yet
+                            interface_name = None
+                        
+                        # Create macvlan interface
+                        interface_name = InterfaceManager.create_macvlan_interface(name=interface_name)
+                        
+                        # Request DHCP IP or assign static
+                        if deployment.network.use_dhcp:
+                            ip_address = InterfaceManager.request_dhcp_ip(interface_name)
+                            if not ip_address:
+                                # DHCP failed, clean up
+                                InterfaceManager.delete_interface(interface_name)
+                                return JsonResponse({
+                                    'status': 'error',
+                                    'message': 'Failed to obtain DHCP IP address. Please try manual IP assignment.'
+                                }, status=500)
+                        else:
+                            ip_address = deployment.network.external_ip
+                            if not InterfaceManager.assign_static_ip(interface_name, ip_address):
+                                # Static IP failed, clean up
+                                InterfaceManager.delete_interface(interface_name)
+                                return JsonResponse({
+                                    'status': 'error',
+                                    'message': f'Failed to assign static IP {ip_address}'
+                                }, status=500)
+                        
+                        # Update database with interface info
+                        deployment.network.external_interface = interface_name
+                        deployment.network.external_ip = ip_address
+                        deployment.network.save()
+                        
+                        logger.info(f"✓ Created macvlan interface {interface_name} with IP {ip_address}")
+                        
+                    except Exception as e:
+                        # Rollback network creation if interface setup fails
+                        network.remove()
+                        deployment.docker_network_id = None
+                        deployment.network_status = 'down'
+                        deployment.save()
+                        logger.error(f"Failed to create macvlan interface: {str(e)}")
+                        return JsonResponse({
+                            'status': 'error',
+                            'message': f'Failed to create macvlan interface: {str(e)}'
+                        }, status=500)
+                
             except docker.errors.APIError as e:
                 return JsonResponse({
                     'status': 'error',
@@ -396,6 +662,37 @@ def toggle_network(request, deployment_id):
                 
         elif action == 'down' and deployment.network_status == 'up':
             try:
+                # NEW: Clean up macvlan interface and NAT rules if they exist
+                if deployment.network.use_external_ip and deployment.network.external_interface:
+                    from xwangnet.services.interface_manager import InterfaceManager
+                    from xwangnet.services.nat_manager import NATManager
+                    from xwangnet.models import EdgeDeviceNATRule
+                    
+                    # Get bridge interface from network ID
+                    bridge_interface = NATManager.get_bridge_interface_from_network(deployment.docker_network_id)
+                    
+                    # Remove all NAT rules for this deployment
+                    nat_rules = EdgeDeviceNATRule.objects.filter(deployment=deployment, active=True)
+                    for rule in nat_rules:
+                        if bridge_interface:
+                            NATManager.remove_nat_rules(
+                                src_ip=rule.lan_ip,
+                                dst_ip=rule.internal_ip,
+                                macvlan_interface=rule.macvlan_interface,
+                                bridge_interface=bridge_interface
+                            )
+                        rule.active = False
+                        rule.save()
+                        logger.info(f"✓ Removed NAT rules for {rule.lan_ip} → {rule.internal_ip}")
+                    
+                    # Release DHCP and delete interface
+                    if deployment.network.create_new_interface:
+                        if deployment.network.use_dhcp:
+                            InterfaceManager.release_dhcp_ip(deployment.network.external_interface)
+                        InterfaceManager.delete_interface(deployment.network.external_interface)
+                        logger.info(f"✓ Deleted macvlan interface {deployment.network.external_interface}")
+                
+                # Remove Docker network
                 network = client.networks.get(deployment.docker_network_id)
                 network.remove()
                 deployment.docker_network_id = None
@@ -504,6 +801,62 @@ def container_action(request, container_id):
             container.status = 'running'
             container.internal_ip = docker_container.attrs['NetworkSettings']['Networks'].get(list(network_config.keys())[0])['IPAddress']
             container.save()
+
+            # NEW: Configure NAT if this is an edge device
+            if container.is_edge_device and container.deployment.network.use_external_ip:
+                try:
+                    from xwangnet.services.nat_manager import NATManager
+                    from xwangnet.models import EdgeDeviceNATRule
+                    
+                    external_ip = container.deployment.network.external_ip
+                    internal_ip = container.internal_ip
+                    macvlan_interface = container.deployment.network.external_interface
+                    
+                    # Get bridge interface from Docker network
+                    bridge_interface = NATManager.get_bridge_interface_from_network(
+                        container.deployment.docker_network_id
+                    )
+                    
+                    if external_ip and internal_ip and macvlan_interface and bridge_interface:
+                        logger.info(f"Configuring NAT for edge device: {external_ip} → {internal_ip}")
+                        logger.info(f"  Macvlan: {macvlan_interface}, Bridge: {bridge_interface}")
+                        
+                        # Configure all 5 iptables rules (DNAT, SNAT, DOCKER-USER x2, FORWARD)
+                        result = NATManager.configure_full_port_nat(
+                            src_ip=external_ip,
+                            dst_ip=internal_ip,
+                            macvlan_interface=macvlan_interface,
+                            bridge_interface=bridge_interface
+                        )
+                        
+                        if result['success']:
+                            # Create or update NAT rule record
+                            EdgeDeviceNATRule.objects.update_or_create(
+                                deployment=container.deployment,
+                                edge_container=container,
+                                defaults={
+                                    'macvlan_interface': macvlan_interface,
+                                    'lan_ip': external_ip,
+                                    'internal_ip': internal_ip,
+                                    'iptables_rules': result['rules'],
+                                    'active': True
+                                }
+                            )
+                            
+                            container.edge_accessible = True
+                            container.save()
+                            
+                            logger.info(f"✓ Configured NAT with all 5 rules: {external_ip} → {internal_ip}")
+                            logger.info(f"  Applied rules: {len(result['rules'])}")
+                        else:
+                            logger.error(f"✗ Failed to configure NAT: {result.get('message', 'Unknown error')}")
+                    else:
+                        logger.warning(f"✗ Cannot configure NAT - missing parameters:")
+                        logger.warning(f"  external_ip={external_ip}, internal_ip={internal_ip}")
+                        logger.warning(f"  macvlan={macvlan_interface}, bridge={bridge_interface}")
+                        
+                except Exception as e:
+                    logger.error(f"Warning: Failed to configure edge device NAT: {str(e)}")
 
             if container.deployment.suricata_status == 'active':
                 try:
@@ -1104,72 +1457,48 @@ def deploy_suricata(request, deployment_id):
             # Set permissions that work for both your user and the container
             os.chmod(dir_path, 0o777)  # Everyone can read/write
 
-        # Step 1: Get network name from deployment
+        # Step 1: Get network name and bridge interface
         network_name = deployment.network.name
+        
+        # Get Docker network and bridge interface for monitoring
+        docker_network = client.networks.get(deployment.docker_network_id)
+        bridge_id = docker_network.id[:12]
+        bridge_interface = f"br-{bridge_id}"
+        
+        print(f"Deploying Suricata to monitor bridge: {bridge_interface}")
 
-        # Step 2: Deploy Suricata as a Gateway
+        # Step 2: Deploy Suricata in host mode to monitor bridge
         suricata_container = client.containers.run(
             "jasonish/suricata:latest",
             name=f"suricata-{deployment.id}",
+            network_mode="host",  # Host mode to access bridge interface
             cap_add=["NET_ADMIN", "NET_RAW", "SYS_NICE"],
             volumes={
                 os.path.join(suricata_dir, f'logs-{deployment.id}'): {'bind': '/var/log/suricata', 'mode': 'rw'},
                 os.path.join(suricata_dir, 'configs'): {'bind': '/etc/suricata', 'mode': 'rw'}
             },
-            network=network_name,
-            #privileged=True,
             detach=True,
-            command="-i eth0"
+            command=f"-i {bridge_interface}"  # Monitor the Docker bridge
         )
 
+        # Wait for Suricata to start
+        time.sleep(3)
+        
+        # Get bridge IP as "Suricata IP" for display purposes
         try:
-            #Check if webtop network exists webtop-network-deployment_id
-            webtop_network = ensure_webtop_network(deployment.id)
-            webtop_network = client.networks.get(f'webtop-network-{deployment_id}')
-            if webtop_network:
-                webtop_network.connect(suricata_container)
-                # Wait for container to be fully started and get its IP
-                print(f"Webtop network connected to Suricata")
-        except Exception as e:
-            print(f"Warning: Failed to connect webtop network to Suricata: {str(e)}")
-        
-        max_retries = 30
-        suricata_ip = None
-        
-        for _ in range(max_retries):
-            suricata_container.reload()  # Refresh container info
-            network_settings = suricata_container.attrs.get('NetworkSettings', {}).get('Networks', {})
-            if network_name in network_settings:
-                suricata_ip = network_settings[network_name].get('IPAddress')
-                if suricata_ip:
-                    break
-            time.sleep(0.5)  # Wait 1 second before next try
+            import subprocess
+            result = subprocess.run(['ip', 'addr', 'show', bridge_interface], 
+                                  capture_output=True, text=True)
+            import re
+            match = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', result.stdout)
+            suricata_ip = match.group(1) if match else "N/A (Bridge Tap Mode)"
+        except:
+            suricata_ip = "N/A (Bridge Tap Mode)"
 
-        if not suricata_ip:
-            raise Exception("Failed to get Suricata container IP address")
+        print(f"Suricata monitoring {bridge_interface}, bridge IP: {suricata_ip}")
 
-        print(f"Suricata IP: {suricata_ip}")
-
-        # Step 3: Configure NAT and routing in Suricata
-        suricata_container.exec_run("sysctl -w net.ipv4.ip_forward=1")
-        
-        # Clear existing rules
-        suricata_container.exec_run("iptables -F")
-        suricata_container.exec_run("iptables -t nat -F")
-        
-        # Get network CIDRs
-        deployment_network_cidr = deployment.network.subnet
-        webtop_network_cidr = f'172.20.{deployment_id}.0/24'
-        
-        # Configure NAT for internet access
-        suricata_container.exec_run("iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE")
-        
-        # Allow forwarding between networks 
-        suricata_container.exec_run(f"iptables -A FORWARD -s {webtop_network_cidr} -d {deployment_network_cidr} -j ACCEPT")
-        suricata_container.exec_run(f"iptables -A FORWARD -s {deployment_network_cidr} -d {webtop_network_cidr} -j ACCEPT")
-        
-        # Allow return traffic
-        suricata_container.exec_run("iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT")
+        # No NAT/routing configuration needed in bridge tap mode
+        # Suricata is passively monitoring all traffic on the bridge
 
         # Save Suricata Container ID
         deployment.suricata_container_id = suricata_container.id
@@ -1236,18 +1565,97 @@ def stop_suricata(request, deployment_id):
         }, status=500)
 
 def get_suricata_logs(request, deployment_id):
-    """Get Suricata logs for a deployment"""
+    """Get filtered and formatted Suricata logs showing only internal network traffic"""
     deployment = get_object_or_404(Deployment, id=deployment_id)
     
     try:
-        if deployment.suricata_container_id and deployment.suricata_status == 'active':
-            container = client.containers.get(deployment.suricata_container_id)
-            logs = container.logs(tail=100).decode('utf-8')
-            return JsonResponse({'status': 'success', 'logs': logs})
-        else:
-            return JsonResponse({'status': 'error', 'message': 'Suricata not running'})
+        if not (deployment.suricata_container_id and deployment.suricata_status == 'active'):
+            return JsonResponse({'status': 'error', 'logs': 'Suricata not running'})
+        
+        # Read eve.json log file
+        base_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+        eve_log = os.path.join(base_dir, 'suricata', f'logs-{deployment.id}', 'eve.json')
+        
+        if not os.path.exists(eve_log):
+            return JsonResponse({'status': 'success', 'logs': 'No logs available yet'})
+        
+        # Get network subnet for filtering
+        import ipaddress as ip_module
+        
+        # Check if subnet is configured
+        if not deployment.network.subnet or deployment.network.subnet.strip() == '':
+            return JsonResponse({'status': 'success', 'logs': 'Network subnet not configured. Please configure subnet in network settings.'})
+        
+        try:
+            network_subnet = ip_module.ip_network(deployment.network.subnet, strict=False)
+        except Exception as e:
+            return JsonResponse({'status': 'success', 'logs': f'Invalid network subnet configuration: {deployment.network.subnet}'})
+        
+        formatted_logs = []
+        
+        # Read last 100 lines of eve.json
+        with open(eve_log, 'r') as f:
+            lines = f.readlines()
+            recent_lines = lines[-100:] if len(lines) > 100 else lines
+        
+        for line in recent_lines:
+            try:
+                data = json.loads(line.strip())
+                
+                # Filter: only flow events
+                if data.get('event_type') != 'flow':
+                    continue
+                
+                src_ip = data.get('src_ip', '')
+                dest_ip = data.get('dest_ip', '')
+                
+                # Filter: at least one IP must be in internal network
+                try:
+                    src_in_network = ip_module.ip_address(src_ip) in network_subnet
+                    dest_in_network = ip_module.ip_address(dest_ip) in network_subnet
+                except:
+                    continue  # Skip invalid IPs
+                
+                if not (src_in_network or dest_in_network):
+                    continue  # Skip traffic not involving internal network
+                
+                # Format the log entry
+                timestamp = data.get('timestamp', '')[:19]  # Just date and time
+                proto = data.get('proto', 'N/A')
+                src_port = data.get('src_port', '')
+                dest_port = data.get('dest_port', '')
+                flow = data.get('flow', {})
+                pkts_to = flow.get('pkts_toserver', 0)
+                pkts_from = flow.get('pkts_toclient', 0)
+                bytes_to = flow.get('bytes_toserver', 0)
+                bytes_from = flow.get('bytes_toclient', 0)
+                
+                # Direction indicator
+                if src_in_network and dest_in_network:
+                    direction = "↔"  # Internal to internal
+                elif src_in_network:
+                    direction = "→"  # Outbound
+                else:
+                    direction = "←"  # Inbound
+                
+                # Build log line
+                port_info = f":{src_port}→:{dest_port}" if src_port and dest_port else ""
+                log_line = f"{timestamp} | {src_ip}{port_info if src_port else ''} {direction} {dest_ip}{port_info if dest_port else ''} | {proto} | ↑{pkts_to}↓{pkts_from} pkts | ↑{bytes_to}↓{bytes_from} bytes"
+                formatted_logs.append(log_line)
+                
+            except json.JSONDecodeError:
+                continue
+            except Exception:
+                continue
+        
+        # Return most recent first
+        formatted_logs.reverse()
+        logs_text = '\n'.join(formatted_logs[-50:]) if formatted_logs else 'No internal network traffic detected yet'
+        
+        return JsonResponse({'status': 'success', 'logs': logs_text})
+        
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)})
+        return JsonResponse({'status': 'error', 'logs': f'Error reading logs: {str(e)}'})
 
 def container_shells(request, container_id):
     container = get_object_or_404(DeployedContainer, id=container_id)
@@ -1423,3 +1831,173 @@ def cleanup_webtop_network(deployment_id):
     except docker.errors.APIError as e:
         print(f"Warning: Failed to remove webtop network: {str(e)}")
 
+# External IP Configuration API Endpoints
+
+def list_interfaces_api(request):
+    """API endpoint to list available network interfaces"""
+    from xwangnet.services.interface_manager import InterfaceManager
+    
+    try:
+        interfaces = InterfaceManager.list_available_interfaces()
+        
+        # Mark server IPs as unavailable to prevent accidental selection
+        server_ips = set()
+        for iface in interfaces:
+            # Mark all current server IPs
+            server_ips.add(iface['ip'])
+        
+        # Add flag to indicate which IPs are server IPs (should not be used)
+        for iface in interfaces:
+            iface['is_server_ip'] = True  # All existing IPs are server IPs
+            iface['warning'] = '⚠️ Server IP - Will disconnect SSH/webserver if selected!'
+        
+        return JsonResponse({
+            'success': True,
+            'interfaces': interfaces,
+            'server_ips': list(server_ips)
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': str(e),
+            'interfaces': [],
+            'server_ips': []
+        }, status=500)
+
+def validate_interface_api(request):
+    """API endpoint to validate interface configuration before deployment"""
+    from xwangnet.services.interface_manager import InterfaceManager
+    from xwangnet.services.nat_manager import NATManager
+    
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'POST method required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        create_new = data.get('create_new', False)
+        use_dhcp = data.get('use_dhcp', True)
+        external_ip = data.get('external_ip', '')
+        external_interface_json = data.get('external_interface', '')
+        
+        # Test 1: Check iptables accessibility
+        nat_test = NATManager.test_nat_configuration()
+        if not nat_test['success']:
+            return JsonResponse({
+                'success': False,
+                'message': f"iptables test failed: {nat_test['message']}"
+            })
+        
+        # Test 2: Validate configuration based on mode
+        if create_new:
+            # Test interface creation capability
+            iface_test = InterfaceManager.test_interface_creation()
+            if not iface_test['success']:
+                return JsonResponse({
+                    'success': False,
+                    'message': f"Interface creation test failed: {iface_test['message']}"
+                })
+            
+            if not use_dhcp and not external_ip:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Manual IP address is required when DHCP is not used'
+                })
+            
+            # Validate IP format if manual
+            if not use_dhcp:
+                import ipaddress
+                try:
+                    ipaddress.ip_address(external_ip)
+                except ValueError:
+                    return JsonResponse({
+                        'success': False,
+                        'message': f'Invalid IP address format: {external_ip}'
+                    })
+            
+            return JsonResponse({
+                'success': True,
+                'message': 'Configuration validated successfully. Ready for deployment.'
+            })
+        else:
+            # Validate existing interface selection
+            if not external_interface_json:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Please select an interface'
+                })
+            
+            try:
+                iface_data = json.loads(external_interface_json)
+                interface_name = iface_data.get('interface')
+                interface_ip = iface_data.get('ip')
+                
+                # Verify interface still exists and has IP
+                verify_result = InterfaceManager.verify_interface_ip(interface_name)
+                if not verify_result['success']:
+                    return JsonResponse({
+                        'success': False,
+                        'message': f"Interface validation failed: {verify_result['message']}"
+                    })
+                
+                # Check for port conflicts
+                conflict_check = NATManager.check_port_conflicts(interface_ip)
+                warning_msg = ''
+                if conflict_check['has_conflicts']:
+                    warning_msg = f" Warning: {conflict_check['message']}"
+                
+                return JsonResponse({
+                    'success': True,
+                    'message': f'Interface {interface_name} ({interface_ip}) is ready.{warning_msg}'
+                })
+                
+            except json.JSONDecodeError:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'Invalid interface data format'
+                })
+    
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Validation error: {str(e)}'
+        }, status=500)
+
+
+def deployment_status_api(request, deployment_id):
+    """API endpoint to get current deployment status including network IP and container IPs"""
+    deployment = get_object_or_404(Deployment, id=deployment_id)
+    
+    try:
+        # Get network information
+        network_data = {
+            'name': deployment.network.name,
+            'external_ip': deployment.network.external_ip if deployment.network.use_external_ip else None,
+            'external_interface': deployment.network.external_interface if deployment.network.use_external_ip else None,
+            'subnet': deployment.network.subnet,
+        }
+        
+        # Get container information with internal IPs
+        containers_data = []
+        for container in deployment.containers.all():
+            container_info = {
+                'id': container.id,
+                'hostname': container.hostname,
+                'status': container.status,
+                'internal_ip': container.internal_ip,
+                'device_name': container.device.name,
+            }
+            containers_data.append(container_info)
+        
+        return JsonResponse({
+            'status': 'success',
+            'network': network_data,
+            'containers': containers_data,
+            'network_status': deployment.network_status,
+            'suricata_status': deployment.suricata_status,
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)

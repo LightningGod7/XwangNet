@@ -27,4 +27,8 @@ urlpatterns = [
     path('deployment/<int:deployment_id>/stop-suricata/', views.stop_suricata, name='stop_suricata'),
     path('deployment/<int:deployment_id>/suricata-logs/', views.get_suricata_logs, name='suricata_logs'),
     path('container/<str:container_id>/shells/', views.container_shells, name='container_shells'),
+    # External IP Configuration API
+    path('api/list-interfaces/', views.list_interfaces_api, name='list_interfaces_api'),
+    path('api/validate-interface/', views.validate_interface_api, name='validate_interface_api'),
+    path('api/deployment/<int:deployment_id>/', views.deployment_status_api, name='deployment_status_api'),
 ]

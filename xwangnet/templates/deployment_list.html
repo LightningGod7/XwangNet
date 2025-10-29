@@ -17,6 +17,7 @@
                     <th>Name</th>
                     <th>Description</th>
                     <th>Network Status</th>
+                    <th>Edge Device</th>
                     <th>Containers</th>
                     <th>Created</th>
                     <th>Actions</th>
@@ -31,6 +32,30 @@
                         <span class="badge bg-{{ deployment.network_status|yesno:'success,danger' }}">
                             {{ deployment.network_status }}
                         </span>
+                    </td>
+                    <td>
+                        {% for container in deployment.containers.all %}
+                            {% if container.is_edge_device %}
+                                <div class="d-flex align-items-center">
+                                    <i class="bi bi-star-fill text-warning me-2"></i>
+                                    <span class="badge bg-info me-2">{{ container.device.name }}</span>
+                                    {% if deployment.network.external_ip %}
+                                        <a href="http://{{ deployment.network.external_ip }}" 
+                                           target="_blank" 
+                                           class="badge bg-success text-decoration-none"
+                                           title="Access edge device">
+                                            <i class="bi bi-globe me-1"></i>{{ deployment.network.external_ip }}
+                                        </a>
+                                    {% else %}
+                                        <span class="badge bg-warning">
+                                            <i class="bi bi-hourglass-split me-1"></i>Pending IP
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% empty %}
+                            <span class="badge bg-secondary">None</span>
+                        {% endfor %}
                     </td>
                     <td>
                         <span class="badge bg-secondary">

@@ -36,7 +36,128 @@
                            value="true"
                            {% if form.isolated.value %}checked{% endif %}>
                     <label class="form-check-label" for="id_isolated">Isolated Network</label>
-                    <div class="form-text">Switch on for an isolated network.</div>
+                    <div class="form-text">Switch on for an isolated network with webtop access.</div>
+                </div>
+
+                <!-- External IP Configuration (shown when not isolated) -->
+                <div id="external-ip-config" style="display: none;">
+                    <div class="d-flex align-items-center mb-3">
+                        <h5 class="mb-0">External IP Configuration</h5>
+                        <button type="button" class="btn btn-link p-0 ms-2" onclick="toggleWarningInfo()" title="Show/hide important information">
+                            <i class="bi bi-exclamation-triangle-fill" style="font-size: 1.2rem; color: #dc3545;"></i>
+                        </button>
+                        <button type="button" class="btn btn-link p-0 ms-1" data-bs-toggle="modal" data-bs-target="#externalIpInfoModal" title="Learn more about external IP binding">
+                            <i class="bi bi-info-circle-fill" style="font-size: 1.2rem; color: #0d6efd;"></i>
+                        </button>
+                    </div>
+
+                    <div id="warning-alert" class="alert alert-danger" role="alert" style="display: none;">
+                        <h6 class="alert-heading">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>⚠️ CRITICAL WARNING
+                        </h6>
+                        <strong>DO NOT use existing server IP (192.168.7.118 or similar)!</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Binding to server IP will <strong>DISCONNECT SSH and Web Server</strong></li>
+                            <li>All ports (including SSH port 22 and webserver port 8000) will be forwarded to the edge device</li>
+                            <li>You will <strong>LOSE REMOTE ACCESS</strong> to this server</li>
+                        </ul>
+                        <hr class="my-2">
+                        <p class="mb-0">
+                            <i class="bi bi-shield-check me-2"></i>
+                            <strong>Recommended:</strong> Always use "Create New Interface" option. 
+                            The system will block server IPs, but remain cautious.
+                        </p>
+                    </div>
+
+                    <!-- Interface Selection Options -->
+                    <div class="mb-3">
+                        <label class="form-label">Interface Configuration</label>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="interface_option" id="use_existing" value="existing" checked>
+                            <label class="form-check-label" for="use_existing">
+                                Use Existing Interface/IP
+                            </label>
+                        </div>
+                        
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="interface_option" id="create_new" value="new">
+                            <label class="form-check-label" for="create_new">
+                                Create New Interface
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Existing Interface Selection -->
+                    <div class="mb-3" id="existing-interface-section">
+                        <label for="id_external_interface" class="form-label">Select Interface/IP</label>
+                        <select class="form-select" id="id_external_interface" name="external_interface">
+                            <option value="">-- Select Interface --</option>
+                            <!-- Will be populated by JavaScript -->
+                        </select>
+                        <div class="form-text">Select an existing network interface to bind the edge device</div>
+                        
+                        <!-- Port Forwarding Configuration -->
+                        <div class="mt-3" id="port-forwarding-section" style="display: none;">
+                            <label for="id_port_forwarding" class="form-label">
+                                Port Forwarding (Optional)
+                                <i class="bi bi-info-circle" title="Specify specific ports to forward instead of all ports"></i>
+                            </label>
+                            <input type="text" 
+                                   class="form-control" 
+                                   id="id_port_forwarding" 
+                                   name="port_forwarding"
+                                   placeholder="e.g., 80:8080,443:8443,22:2222">
+                            <div class="form-text">
+                                Format: <code>&lt;container-port&gt;:&lt;host-port&gt;</code> separated by commas<br>
+                                Leave empty to forward ALL ports (not recommended for server IP)
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- New Interface Configuration -->
+                    <div id="new-interface-section" style="display: none;">
+                        <div class="mb-3">
+                            <label class="form-label">IP Assignment Method</label>
+                            
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="ip_assignment" id="use_dhcp" value="dhcp" checked>
+                                <label class="form-check-label" for="use_dhcp">
+                                    DHCP (Automatic)
+                                </label>
+                                <div class="form-text">Automatically obtain IP from router (preferred range: 192.168.7.220-254)</div>
+                            </div>
+                            
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="ip_assignment" id="use_manual" value="manual">
+                                <label class="form-check-label" for="use_manual">
+                                    Manual (Static IP)
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Manual IP Input -->
+                        <div class="mb-3" id="manual-ip-section" style="display: none;">
+                            <label for="id_external_ip" class="form-label">Manual IP Address</label>
+                            <input type="text"
+                                   class="form-control"
+                                   id="id_external_ip"
+                                   name="external_ip"
+                                   placeholder="e.g., 192.168.7.220">
+                            <div class="form-text">Enter the static IP address to assign</div>
+                        </div>
+                    </div>
+
+                    <!-- Validation Status -->
+                    <div id="validation-status" class="alert" style="display: none;"></div>
+
+                    <!-- Test Configuration Button -->
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-outline-primary" id="test-interface-btn">
+                            <i class="bi bi-check-circle me-2"></i>Test Configuration
+                        </button>
+                        <small class="form-text text-muted ms-2">Validate interface creation and IP leasing before deployment</small>
+                    </div>
                 </div>
 
                 <div class="mb-3">
@@ -79,17 +200,316 @@
         </div>
     </div>
 </div>
+
+<!-- Info Modal -->
+<div class="modal fade" id="externalIpInfoModal" tabindex="-1" aria-labelledby="externalIpInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="externalIpInfoModalLabel">
+                    <i class="bi bi-info-circle me-2"></i>External IP Binding Configuration
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <h6 class="fw-bold">What is External IP Binding?</h6>
+                <p>
+                    When you disable network isolation, XwangNet can bind your edge device (e.g., router honeypot) directly to a unique IP address on your local network. 
+                    This makes the device appear as a physical device on the network, accessible via LAN and optionally exposed to the internet.
+                </p>
+
+                <h6 class="fw-bold mt-3">How it Works</h6>
+                <ul>
+                    <li><strong>Existing Interface:</strong> Bind to an IP address that's already configured on the server (e.g., 192.168.7.118)</li>
+                    <li><strong>New Interface:</strong> Create a new macvlan interface and lease a new IP from the router (e.g., 192.168.7.220)</li>
+                    <li>All ports (1-65535) from the edge device are forwarded to the selected IP</li>
+                    <li>Traffic is monitored by Suricata IDS to capture attack telemetry</li>
+                </ul>
+
+                <h6 class="fw-bold mt-3">Configuration Options</h6>
+                <div class="accordion" id="configAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseExisting">
+                                Use Existing Interface
+                            </button>
+                        </h2>
+                        <div id="collapseExisting" class="accordion-collapse collapse show" data-bs-parent="#configAccordion">
+                            <div class="accordion-body">
+                                <strong>Best for:</strong> Quick setup without creating new network interfaces<br>
+                                <strong>Requirement:</strong> Must have an available IP that isn't used by critical services<br>
+                                <strong>Note:</strong> All ports on that IP will be forwarded to the edge device
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseNew">
+                                Create New Interface (DHCP)
+                            </button>
+                        </h2>
+                        <div id="collapseNew" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                            <div class="accordion-body">
+                                <strong>Best for:</strong> Clean deployment with dedicated IP<br>
+                                <strong>Requirement:</strong> Router must have available DHCP leases<br>
+                                <strong>Automatic:</strong> XwangNet creates a macvlan interface and requests IP via DHCP<br>
+                                <strong>Preferred Range:</strong> 192.168.7.220-254 (configurable in router)
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseManual">
+                                Create New Interface (Manual)
+                            </button>
+                        </h2>
+                        <div id="collapseManual" class="accordion-collapse collapse" data-bs-parent="#configAccordion">
+                            <div class="accordion-body">
+                                <strong>Best for:</strong> Specific IP requirements or DHCP exhaustion<br>
+                                <strong>Requirement:</strong> IP must not be in DHCP range or reserved in router<br>
+                                <strong>Manual:</strong> You specify the exact IP to assign
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <h6 class="fw-bold mt-3">⚠️ Critical Warnings</h6>
+                <div class="alert alert-danger" role="alert">
+                    <h6 class="alert-heading">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>DANGER: Using Existing Server IP
+                    </h6>
+                    <hr>
+                    <p class="mb-2"><strong>If you select an existing interface with the server's IP address (e.g., 192.168.7.118):</strong></p>
+                    <ul class="mb-2">
+                        <li>❌ <strong>SSH connection will be DISCONNECTED immediately</strong></li>
+                        <li>❌ <strong>Web server (port 8000) will become INACCESSIBLE</strong></li>
+                        <li>❌ <strong>You will LOSE REMOTE ACCESS to the server</strong></li>
+                        <li>❌ <strong>All ports (1-65535) will be forwarded to the edge device</strong></li>
+                    </ul>
+                    <p class="mb-0">
+                        <strong>✅ SOLUTION:</strong> Always use "Create New Interface" option to avoid this issue. 
+                        The system will now block selection of server IPs, but be aware of the risk.
+                    </p>
+                </div>
+                
+                <div class="alert alert-warning" role="alert">
+                    <h6 class="alert-heading">Other Important Warnings</h6>
+                    <ul class="mb-0">
+                        <li><strong>Network Access:</strong> Edge devices will be fully accessible from your LAN. Ensure proper security measures</li>
+                        <li><strong>Internet Exposure:</strong> If you port-forward on your router, the device will be exposed to the internet (intended for honeypot use)</li>
+                        <li><strong>Testing Required:</strong> Always use the "Test Configuration" button before deployment to validate settings</li>
+                        <li><strong>Edge Device Required:</strong> You must designate an edge device on the previous page for external IP binding</li>
+                    </ul>
+                </div>
+
+                <h6 class="fw-bold mt-3">Use Case: Honeypot Deployment</h6>
+                <p>
+                    This configuration is designed for deploying IoT honeypots that are:
+                </p>
+                <ul>
+                    <li>Detectable on Shodan and other internet scanners</li>
+                    <li>Accessible to attackers for baiting and telemetry collection</li>
+                    <li>Monitored by Suricata IDS for network-level attack detection</li>
+                    <li>Running with OS-level telemetry via strace</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    // Toggle warning alert visibility
+    function toggleWarningInfo() {
+        const warningAlert = document.getElementById('warning-alert');
+        if (warningAlert.style.display === 'none') {
+            warningAlert.style.display = 'block';
+        } else {
+            warningAlert.style.display = 'none';
+        }
+    }
+
     (function () {
         'use strict'
 
         const forms = document.querySelectorAll('.needs-validation')
         const subnetInput = document.getElementById('id_subnet')
         const gatewayInput = document.getElementById('id_gateway')
+        const isolatedCheckbox = document.getElementById('id_isolated')
+        const externalIpConfig = document.getElementById('external-ip-config')
+        const useExistingRadio = document.getElementById('use_existing')
+        const createNewRadio = document.getElementById('create_new')
+        const existingInterfaceSection = document.getElementById('existing-interface-section')
+        const newInterfaceSection = document.getElementById('new-interface-section')
+        const useDhcpRadio = document.getElementById('use_dhcp')
+        const useManualRadio = document.getElementById('use_manual')
+        const manualIpSection = document.getElementById('manual-ip-section')
+        const testInterfaceBtn = document.getElementById('test-interface-btn')
+        const validationStatus = document.getElementById('validation-status')
+        const externalInterfaceSelect = document.getElementById('id_external_interface')
 
+        // Toggle external IP configuration based on isolated checkbox
+        function toggleExternalIpConfig() {
+            if (isolatedCheckbox.checked) {
+                externalIpConfig.style.display = 'none'
+            } else {
+                externalIpConfig.style.display = 'block'
+                loadAvailableInterfaces()
+            }
+        }
+
+        isolatedCheckbox.addEventListener('change', toggleExternalIpConfig)
+        toggleExternalIpConfig() // Initial state
+
+        // Toggle between existing interface and new interface
+        useExistingRadio.addEventListener('change', function() {
+            existingInterfaceSection.style.display = 'block'
+            newInterfaceSection.style.display = 'none'
+        })
+
+        createNewRadio.addEventListener('change', function() {
+            existingInterfaceSection.style.display = 'none'
+            newInterfaceSection.style.display = 'block'
+            // Hide port forwarding when creating new interface
+            document.getElementById('port-forwarding-section').style.display = 'none'
+        })
+
+        // Toggle manual IP input
+        useManualRadio.addEventListener('change', function() {
+            manualIpSection.style.display = 'block'
+        })
+
+        useDhcpRadio.addEventListener('change', function() {
+            manualIpSection.style.display = 'none'
+        })
+
+        // Load available interfaces via AJAX
+        function loadAvailableInterfaces() {
+            fetch('/api/list-interfaces/')
+                .then(response => response.json())
+                .then(data => {
+                    externalInterfaceSelect.innerHTML = '<option value="">-- Select Interface --</option>'
+                    
+                    if (data.interfaces.length === 0) {
+                        const option = document.createElement('option')
+                        option.value = ""
+                        option.textContent = "No interfaces available"
+                        option.disabled = true
+                        externalInterfaceSelect.appendChild(option)
+                        return
+                    }
+                    
+                    data.interfaces.forEach(iface => {
+                        const option = document.createElement('option')
+                        option.value = JSON.stringify(iface)
+                        
+                        if (iface.is_server_ip) {
+                            // Mark server IPs with warning
+                            option.textContent = `${iface.interface} (${iface.ip}) - ⚠️ SERVER IP - DO NOT USE`
+                            option.style.color = 'red'
+                            option.style.fontWeight = 'bold'
+                            // Still allow selection but with clear warning
+                        } else {
+                            option.textContent = `${iface.interface} (${iface.ip})`
+                        }
+                        
+                        externalInterfaceSelect.appendChild(option)
+                    })
+                    
+                    // Add change listener to show warning and port forwarding option
+                    externalInterfaceSelect.addEventListener('change', function() {
+                        const portForwardingSection = document.getElementById('port-forwarding-section')
+                        
+                        if (this.value) {
+                            try {
+                                const selected = JSON.parse(this.value)
+                                
+                                // Show port forwarding section for server IPs
+                                if (selected.is_server_ip) {
+                                    portForwardingSection.style.display = 'block'
+                                    
+                                    if (!confirm(
+                                        '⚠️ CRITICAL WARNING ⚠️\n\n' +
+                                        'You selected a SERVER IP address!\n\n' +
+                                        'This will:\n' +
+                                        '❌ Disconnect SSH (port 22)\n' +
+                                        '❌ Disconnect Web Server (port 8000)\n' +
+                                        '❌ Make server INACCESSIBLE remotely\n\n' +
+                                        'RECOMMENDED: Use the Port Forwarding field below to forward ONLY specific ports\n' +
+                                        '(e.g., 80:8080,443:8443 to avoid SSH/webserver conflict)\n\n' +
+                                        'Are you ABSOLUTELY SURE you want to continue?\n' +
+                                        '(Better option: Choose "Create New Interface" instead)'
+                                    )) {
+                                        this.value = ''
+                                        portForwardingSection.style.display = 'none'
+                                    }
+                                } else {
+                                    portForwardingSection.style.display = 'none'
+                                }
+                            } catch (e) {
+                                console.error('Error parsing selection:', e)
+                                portForwardingSection.style.display = 'none'
+                            }
+                        } else {
+                            portForwardingSection.style.display = 'none'
+                        }
+                    })
+                })
+                .catch(error => {
+                    console.error('Error loading interfaces:', error)
+                    externalInterfaceSelect.innerHTML = '<option value="">Error loading interfaces</option>'
+                })
+        }
+
+        // Test interface configuration
+        testInterfaceBtn.addEventListener('click', function() {
+            validationStatus.style.display = 'none'
+            testInterfaceBtn.disabled = true
+            testInterfaceBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Testing...'
+
+            const config = {
+                create_new: createNewRadio.checked,
+                use_dhcp: useDhcpRadio.checked,
+                external_ip: document.getElementById('id_external_ip').value,
+                external_interface: externalInterfaceSelect.value
+            }
+
+            fetch('/api/validate-interface/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify(config)
+            })
+            .then(response => response.json())
+            .then(data => {
+                testInterfaceBtn.disabled = false
+                testInterfaceBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Test Configuration'
+
+                validationStatus.style.display = 'block'
+                if (data.success) {
+                    validationStatus.className = 'alert alert-success'
+                    validationStatus.innerHTML = `<i class="bi bi-check-circle me-2"></i>${data.message}`
+                } else {
+                    validationStatus.className = 'alert alert-danger'
+                    validationStatus.innerHTML = `<i class="bi bi-x-circle me-2"></i>${data.message}`
+                }
+            })
+            .catch(error => {
+                testInterfaceBtn.disabled = false
+                testInterfaceBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Test Configuration'
+                validationStatus.style.display = 'block'
+                validationStatus.className = 'alert alert-danger'
+                validationStatus.innerHTML = `<i class="bi bi-x-circle me-2"></i>Error: ${error.message}`
+            })
+        })
+
+        // Form validation
         Array.prototype.slice.call(forms).forEach(function (form) {
             form.addEventListener('submit', function (event) {
                 if (!form.checkValidity()) {
