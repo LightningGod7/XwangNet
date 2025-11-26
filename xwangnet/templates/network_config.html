@@ -55,7 +55,7 @@
                         <h6 class="alert-heading">
                             <i class="bi bi-exclamation-triangle-fill me-2"></i>⚠️ CRITICAL WARNING
                         </h6>
-                        <strong>DO NOT use existing server IP (192.168.7.118 or similar)!</strong>
+                        <strong>DO NOT use existing server IP ({{server_ip}} or similar)!</strong>
                         <ul class="mb-0 mt-2">
                             <li>Binding to server IP will <strong>DISCONNECT SSH and Web Server</strong></li>
                             <li>All ports (including SSH port 22 and webserver port 8000) will be forwarded to the edge device</li>
@@ -220,8 +220,8 @@
 
                 <h6 class="fw-bold mt-3">How it Works</h6>
                 <ul>
-                    <li><strong>Existing Interface:</strong> Bind to an IP address that's already configured on the server (e.g., 192.168.7.118)</li>
-                    <li><strong>New Interface:</strong> Create a new macvlan interface and lease a new IP from the router (e.g., 192.168.7.220)</li>
+                    <li><strong>Existing Interface:</strong> Bind to an IP address that's already configured on the server</li>
+                    <li><strong>New Interface:</strong> Create a new macvlan interface and lease a new IP from the router</li>
                     <li>All ports (1-65535) from the edge device are forwarded to the selected IP</li>
                     <li>Traffic is monitored by Suricata IDS to capture attack telemetry</li>
                 </ul>

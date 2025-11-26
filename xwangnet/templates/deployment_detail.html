@@ -566,7 +566,7 @@ async function containerAction(containerId, action) {
     const statusSpan = containerDiv.querySelector('.container-status');
     const errorDiv = document.getElementById(`container-error-${containerId}`);
     const logsDiv = document.getElementById(`logs-${containerId}`);
-    const ipPara = containerDiv.querySelector("#internal-ip")
+    const ipSpan = document.getElementById(`container-ip-${containerId}`);
     // Hide previous error
     errorDiv.style.display = 'none';
     
@@ -587,8 +587,8 @@ async function containerAction(containerId, action) {
         
         if (data.status === 'success') {
             // Update internal IP if element exists
-            if (ipPara) {
-                ipPara.innerHTML = data.internal_ip;
+            if (ipSpan && data.internal_ip) {
+                ipSpan.textContent = data.internal_ip;
             }
             statusSpan.textContent = data.container_status;
             statusSpan.className = `container-status badge bg-${data.container_status === 'running' ? 'success' : 'danger'}`;

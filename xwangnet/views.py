@@ -20,6 +20,8 @@ import docker.errors
 from xwangnet.services.proxy_manager import ProxyManager
 import time
 import logging
+import subprocess
+import ipaddress
 
 client = docker.from_env()
 logger = logging.getLogger(__name__)
@@ -146,7 +148,8 @@ def device_selection(request):
             for device_id, count in device_counts.items():
                 device = DeviceTemplate.objects.get(id=device_id)
                 for i in range(count):
-                    device_name = f"{device.name}-{device.version}-{i+1}" if count > 1 else device.name
+                    # Match frontend naming: device-1, device-2, etc. (not device-version-1)
+                    device_name = f"{device.name}-{i+1}" if count > 1 else device.name
                     selected_devices.append({
                         'id': device.id,
                         'name': device_name,
@@ -172,6 +175,11 @@ def network_config(request):
             # Handle external IP configuration (non-isolated mode)
             if not network.isolated:
                 interface_option = request.POST.get('interface_option')
+                
+                # Validate that interface_option is provided
+                if not interface_option or interface_option not in ['existing', 'new']:
+                    messages.error(request, 'Please select an interface configuration option (existing or new interface)')
+                    return render(request, 'network_config.html', {'form': form})
                 
                 # Check if edge device is designated
                 edge_device = request.session.get('edge_device', '')
@@ -946,6 +954,37 @@ def container_action(request, container_id):
                     if container.device.name == 'webtop' and container.hostname:
                         ProxyManager.remove_webtop_proxy(container.hostname)
                     
+                    # Remove NAT rules if this is an edge device
+                    if container.is_edge_device:
+                        from xwangnet.models import EdgeDeviceNATRule
+                        from xwangnet.services.nat_manager import NATManager
+                        
+                        nat_rules = EdgeDeviceNATRule.objects.filter(edge_container=container, active=True)
+                        for nat_rule in nat_rules:
+                            # Get bridge interface from docker network ID
+                            bridge_interface = NATManager.get_bridge_interface_from_network(
+                                container.deployment.docker_network_id
+                            )
+                            
+                            if bridge_interface:
+                                result = NATManager.remove_nat_rules(
+                                    nat_rule.lan_ip,
+                                    nat_rule.internal_ip,
+                                    nat_rule.macvlan_interface,
+                                    bridge_interface
+                                )
+                                if result['success']:
+                                    nat_rule.active = False
+                                    nat_rule.save()
+                                    print(f"✓ Removed NAT rules for edge device {container.hostname or container.device.name}")
+                                else:
+                                    print(f"Warning: Failed to remove NAT rules: {result.get('message', 'Unknown error')}")
+                            else:
+                                print(f"Warning: Could not find bridge interface for network {container.deployment.docker_network_id}")
+                        
+                        # Mark edge device as not accessible
+                        container.edge_accessible = False
+                    
                 except docker.errors.NotFound:
                     pass
                 container.status = 'stopped'
@@ -966,6 +1005,7 @@ def container_action(request, container_id):
                 max_retries = 30  # 30 seconds timeout
                 retry_interval = 1  # 1 second between checks
                 
+                container_ready = False
                 for _ in range(max_retries):
                     docker_container.reload()  # Refresh container info
                     if docker_container.status == 'running':
@@ -974,31 +1014,38 @@ def container_action(request, container_id):
                             # Get container health status if available
                             health = docker_container.attrs.get('State', {}).get('Health', {}).get('Status')
                             if health == 'healthy' or health is None:  # None means no health check defined
+                                container_ready = True
                                 break
                         except:
                             pass
                     time.sleep(retry_interval)
-                else:  # Loop completed without break - container not ready
+                
+                if not container_ready:
                     raise Exception("Container failed to start within timeout period")
-                    
-                    # Add new proxy
+                
+                # Add new proxy after container is ready (only for webtop)
+                if container.device.name == 'webtop':
                     container_info = docker_container.attrs
                     network_settings = container_info['NetworkSettings']['Networks']
-                    network_info = network_settings.get(list(network_config.keys())[0])
+                    network_config = {}  # This should be populated from deployment network config
                     
-                    if network_info:
-                        hostname = ProxyManager.generate_webtop_hostname()
-                        container_ip = network_info['IPAddress']
+                    if network_settings:
+                        # Get first available network
+                        network_info = list(network_settings.values())[0] if network_settings else None
                         
-                        success = ProxyManager.add_webtop_proxy(
-                            hostname,
-                            container_ip,
-                            3000
-                        )
-                        
-                        if success:
-                            container.hostname = hostname
-                            container.save()
+                        if network_info:
+                            hostname = ProxyManager.generate_webtop_hostname()
+                            container_ip = network_info['IPAddress']
+                            
+                            success = ProxyManager.add_webtop_proxy(
+                                hostname,
+                                container_ip,
+                                3000
+                            )
+                            
+                            if success:
+                                container.hostname = hostname
+                                container.save()
             
         return JsonResponse({
             'status': 'success', 

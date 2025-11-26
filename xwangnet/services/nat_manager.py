@@ -1,6 +1,7 @@
 import subprocess
 import re
 import logging
+import ipaddress
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +29,22 @@ class NATManager:
         Returns:
             dict: Result with success status and list of applied rules
         """
+        # Validate IP addresses
+        try:
+            ipaddress.ip_address(src_ip)
+            ipaddress.ip_address(dst_ip)
+        except ValueError as e:
+            logger.error(f"Invalid IP address: {e}")
+            return {'success': False, 'rules': [], 'message': f'Invalid IP address: {e}'}
+        
+        # Validate interface names
+        if not re.match(r'^[a-zA-Z0-9_-]{1,15}$', macvlan_interface):
+            logger.error(f"Invalid macvlan interface name: {macvlan_interface}")
+            return {'success': False, 'rules': [], 'message': f'Invalid macvlan interface name'}
+        if not re.match(r'^[a-zA-Z0-9_-]{1,15}$', bridge_interface):
+            logger.error(f"Invalid bridge interface name: {bridge_interface}")
+            return {'success': False, 'rules': [], 'message': f'Invalid bridge interface name'}
+        
         applied_rules = []
         
         try:
@@ -88,13 +105,14 @@ class NATManager:
             }
             
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to configure NAT: {e.stderr.decode()}")
+            stderr_msg = e.stderr.decode() if e.stderr else str(e)
+            logger.error(f"Failed to configure NAT: {stderr_msg}")
             # Attempt to roll back any applied rules
             NATManager._rollback_rules(applied_rules, macvlan_interface, bridge_interface)
             return {
                 'success': False,
                 'rules': [],
-                'message': f'Failed to configure NAT: {e.stderr.decode()}'
+                'message': f'Failed to configure NAT: {stderr_msg}'
             }
         except Exception as e:
             logger.error(f"Unexpected error configuring NAT: {e}")
@@ -132,8 +150,9 @@ class NATManager:
                         ['iptables', '-D', chain] + rule.split(),
                         capture_output=True
                     )
-            except:
-                pass  # Best effort rollback
+            except Exception:
+                # Best effort rollback - rules may not exist
+                pass
     
     @staticmethod
     def remove_nat_rules(src_ip, dst_ip, macvlan_interface, bridge_interface, parent_interface='ens18'):
@@ -163,8 +182,8 @@ class NATManager:
                 )
                 removed += 1
                 logger.info(f"✓ Removed DNAT rule")
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to remove DNAT rule (may not exist): {e}")
             
             # Remove Rule 2: SNAT
             try:
@@ -175,8 +194,8 @@ class NATManager:
                 )
                 removed += 1
                 logger.info(f"✓ Removed SNAT rule")
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to remove SNAT rule (may not exist): {e}")
             
             # Remove Rule 3: DOCKER-USER incoming
             try:
@@ -187,8 +206,8 @@ class NATManager:
                 )
                 removed += 1
                 logger.info(f"✓ Removed DOCKER-USER incoming rule")
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to remove DOCKER-USER incoming rule (may not exist): {e}")
             
             # Remove Rule 4: DOCKER-USER outgoing via macvlan0
             try:
@@ -199,8 +218,8 @@ class NATManager:
                 )
                 removed += 1
                 logger.info(f"✓ Removed DOCKER-USER outgoing rule")
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to remove DOCKER-USER outgoing rule (may not exist): {e}")
             
             # Remove Rule 5: FORWARD from bridge (THE CRITICAL FIX)
             try:
@@ -211,8 +230,8 @@ class NATManager:
                 )
                 removed += 1
                 logger.info(f"✓ Removed FORWARD rule")
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Failed to remove FORWARD rule (may not exist): {e}")
             
             logger.info(f"Removed {removed}/5 NAT rules for {src_ip} → {dst_ip}")
             

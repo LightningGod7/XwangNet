@@ -81,6 +81,10 @@ class InterfaceManager:
         parent = parent or InterfaceManager.PARENT_INTERFACE
         name = name or InterfaceManager.get_available_interface_name()
         
+        # Validate interface name: Linux interface names are up to 15 chars, alphanumeric, underscore, dash
+        if not re.match(r'^[a-zA-Z0-9_-]{1,15}$', name):
+            raise ValueError(f"Invalid interface name: {name!r}. Must be 1-15 chars, alphanumeric, underscore, or dash.")
+        
         try:
             logger.info(f"Creating macvlan interface {name} on parent {parent}")
             
@@ -102,8 +106,9 @@ class InterfaceManager:
             return name
             
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to create interface {name}: {e.stderr.decode()}")
-            raise Exception(f"Failed to create macvlan interface: {e.stderr.decode()}")
+            stderr_msg = e.stderr.decode() if e.stderr else str(e)
+            logger.error(f"Failed to create interface {name}: {stderr_msg}")
+            raise Exception(f"Failed to create macvlan interface: {stderr_msg}")
     
     @staticmethod
     def request_dhcp_ip(interface, preferred_range=None):
@@ -145,8 +150,8 @@ class InterfaceManager:
                         capture_output=True,
                         timeout=5
                     )
-                except:
-                    pass  # arping may not be available, not critical
+                except Exception as e:
+                    logger.warning(f"arping failed for {interface} ({assigned_ip}): {e}")
                 
                 return assigned_ip
             else:
@@ -185,7 +190,8 @@ class InterfaceManager:
             return True
             
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to assign static IP: {e.stderr.decode()}")
+            stderr_msg = e.stderr.decode() if e.stderr else str(e)
+            logger.error(f"Failed to assign static IP: {stderr_msg}")
             return False
     
     @staticmethod
@@ -276,7 +282,8 @@ class InterfaceManager:
             return True
             
         except subprocess.CalledProcessError as e:
-            logger.error(f"Failed to delete interface {interface}: {e.stderr.decode()}")
+            stderr_msg = e.stderr.decode() if e.stderr else str(e)
+            logger.error(f"Failed to delete interface {interface}: {stderr_msg}")
             return False
     
     @staticmethod
@@ -325,9 +332,10 @@ class InterfaceManager:
             }
             
         except subprocess.CalledProcessError as e:
+            stderr_msg = e.stderr.decode() if e.stderr else str(e)
             return {
                 'success': False,
-                'message': f'Interface creation test failed: {e.stderr.decode()}'
+                'message': f'Interface creation test failed: {stderr_msg}'
             }
         except Exception as e:
             return {
