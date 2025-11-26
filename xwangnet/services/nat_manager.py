@@ -382,7 +382,7 @@ class NATManager:
         """
         try:
             # Check if iptables is available
-            result = subprocess.run(
+            subprocess.run(
                 ['which', 'iptables'],
                 capture_output=True,
                 check=True
