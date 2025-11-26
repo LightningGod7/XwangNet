@@ -1022,7 +1022,7 @@ def container_action(request, container_id):
                             if health == 'healthy' or health is None:  # None means no health check defined
                                 container_ready = True
                                 break
-                        except:
+                        except Exception:
                             pass
                     time.sleep(retry_interval)
                 
