@@ -264,9 +264,9 @@ def network_config(request):
                                 'original_name': 'webtop'
                             })
                             request.session['selected_devices'] = selected_devices
-                            print("✓ Auto-added webtop for isolated network")
+                            logger.info("✓ Auto-added webtop for isolated network")
                 except Exception as e:
-                    print(f"Warning: Failed to auto-add webtop: {str(e)}")
+                    logger.warning(f"Failed to auto-add webtop: {str(e)}")
             
             network.save()
             request.session['network_id'] = network.id
@@ -398,11 +398,11 @@ def deployment_detail(request, deployment_id):
                         docker_container = client.containers.get(container.container_id)
                         docker_container.stop(timeout=10)
                         docker_container.remove()
-                        print(f"✓ Stopped and removed container {container.hostname}")
+                        logger.info(f"✓ Stopped and removed container {container.hostname}")
                     except docker.errors.NotFound:
-                        print(f"Container {container.hostname} already removed")
+                        logger.info(f"Container {container.hostname} already removed")
                     except Exception as e:
-                        print(f"Warning: Failed to stop container {container.hostname}: {str(e)}")
+                        logger.warning(f"Failed to stop container {container.hostname}: {str(e)}")
             
             # Step 2: Stop Suricata container
             if deployment.suricata_container_id:
@@ -410,11 +410,11 @@ def deployment_detail(request, deployment_id):
                     suricata_container = client.containers.get(deployment.suricata_container_id)
                     suricata_container.stop(timeout=10)
                     suricata_container.remove()
-                    print(f"✓ Stopped and removed Suricata container")
+                    logger.info("✓ Stopped and removed Suricata container")
                 except docker.errors.NotFound:
-                    print("Suricata container already removed")
+                    logger.info("Suricata container already removed")
                 except Exception as e:
-                    print(f"Warning: Failed to stop Suricata: {str(e)}")
+                    logger.warning(f"Failed to stop Suricata: {str(e)}")
             
             # Step 3: Clean up macvlan interface and NAT rules if they exist
             if deployment.network.use_external_ip and deployment.network.external_interface:
@@ -435,7 +435,7 @@ def deployment_detail(request, deployment_id):
                             macvlan_interface=rule.macvlan_interface,
                             bridge_interface=bridge_interface
                         )
-                        print(f"✓ Removed NAT rules for {rule.lan_ip} → {rule.internal_ip}")
+                        logger.info(f"✓ Removed NAT rules for {rule.lan_ip} → {rule.internal_ip}")
                     rule.delete()
                 
                 # Release DHCP and delete interface
@@ -443,18 +443,18 @@ def deployment_detail(request, deployment_id):
                     if deployment.network.use_dhcp:
                         InterfaceManager.release_dhcp_ip(deployment.network.external_interface)
                     InterfaceManager.delete_interface(deployment.network.external_interface)
-                    print(f"✓ Deleted macvlan interface {deployment.network.external_interface}")
+                    logger.info(f"✓ Deleted macvlan interface {deployment.network.external_interface}")
             
             # Step 4: Remove Docker networks
             if deployment.docker_network_id:
                 try:
                     network = client.networks.get(deployment.docker_network_id)
                     network.remove()
-                    print(f"✓ Removed Docker network {deployment.network.name}")
+                    logger.info(f"✓ Removed Docker network {deployment.network.name}")
                 except docker.errors.NotFound:
-                    print("Docker network already removed")
+                    logger.info("Docker network already removed")
                 except Exception as e:
-                    print(f"Warning: Failed to remove Docker network: {str(e)}")
+                    logger.warning(f"Failed to remove Docker network: {str(e)}")
             
             # Step 5: Clean up webtop network
             cleanup_webtop_network(deployment_id)
@@ -467,7 +467,7 @@ def deployment_detail(request, deployment_id):
             
             # Step 8: Delete network if no more deployments use it
             if not network.deployment_set.exists():
-                print(f"✓ No more deployments using network {network.name}, deleting network configuration")
+                logger.info(f"✓ No more deployments using network {network.name}, deleting network configuration")
                 network.delete()
             
             return JsonResponse({'status': 'success', 'message': 'Deployment deleted successfully'})
@@ -602,7 +602,7 @@ def toggle_network(request, deployment_id):
                             deployment.network.subnet = actual_subnet
                             deployment.network.gateway = actual_gateway
                             deployment.network.save()
-                            print(f"✓ Populated network subnet: {actual_subnet}, gateway: {actual_gateway}")
+                            logger.info(f"✓ Populated network subnet: {actual_subnet}, gateway: {actual_gateway}")
                 
                 # NEW: Create macvlan interface and configure external IP if needed
                 if deployment.network.use_external_ip and deployment.network.create_new_interface:
@@ -879,7 +879,7 @@ def container_action(request, container_id):
                         suricata_ip = suricata_container.attrs['NetworkSettings']['Networks'][container.deployment.network.name]['IPAddress']
                     configure_container_routing(docker_container, suricata_ip)
                 except Exception as e:
-                    print(f"Warning: Failed to configure Suricata routing: {str(e)}")
+                    logger.warning(f"Failed to configure Suricata routing: {str(e)}")
 
             # Handle webtop proxy if this is a webtop container
             if container.device.name == 'webtop':
@@ -911,7 +911,7 @@ def container_action(request, container_id):
                     hostname = ProxyManager.generate_webtop_hostname()
                     container_ip = network_info['IPAddress']
                     
-                    print(f"Container IP: {container_ip}")  # Debug print
+                    logger.debug(f"Container IP: {container_ip}")
                     
                     success = ProxyManager.add_webtop_proxy(
                         hostname,
@@ -920,12 +920,12 @@ def container_action(request, container_id):
                     )
                     
                     if success:
-                        print(f"Successfully added proxy for {hostname} -> {container_ip}:3000")
+                        logger.info(f"Successfully added proxy for {hostname} -> {container_ip}:3000")
                         container.hostname = hostname
                         container.save()
                         
                 else:
-                    print(f"Network info: {network_info}")  # Debug print
+                    logger.debug(f"Network info: {network_info}")
                     return JsonResponse({
                         'status': 'error',
                         'message': 'Could not get container IP address'
@@ -945,7 +945,7 @@ def container_action(request, container_id):
                         except docker.errors.NotFound:
                             pass  # Network might already be gone
                         except docker.errors.APIError as e:
-                            print(f"Warning: Failed to disconnect from webtop network: {str(e)}")
+                            logger.warning(f"Failed to disconnect from webtop network: {str(e)}")
                             # Continue with container stop even if network disconnect fails
 
                     docker_container.stop()
@@ -976,11 +976,11 @@ def container_action(request, container_id):
                                 if result['success']:
                                     nat_rule.active = False
                                     nat_rule.save()
-                                    print(f"✓ Removed NAT rules for edge device {container.hostname or container.device.name}")
+                                    logger.info(f"✓ Removed NAT rules for edge device {container.hostname or container.device.name}")
                                 else:
-                                    print(f"Warning: Failed to remove NAT rules: {result.get('message', 'Unknown error')}")
+                                    logger.warning(f"Failed to remove NAT rules: {result.get('message', 'Unknown error')}")
                             else:
-                                print(f"Warning: Could not find bridge interface for network {container.deployment.docker_network_id}")
+                                logger.warning(f"Could not find bridge interface for network {container.deployment.docker_network_id}")
                         
                         # Mark edge device as not accessible
                         container.edge_accessible = False
@@ -1027,7 +1027,6 @@ def container_action(request, container_id):
                 if container.device.name == 'webtop':
                     container_info = docker_container.attrs
                     network_settings = container_info['NetworkSettings']['Networks']
-                    network_config = {}  # This should be populated from deployment network config
                     
                     if network_settings:
                         # Get first available network
@@ -1512,7 +1511,7 @@ def deploy_suricata(request, deployment_id):
         bridge_id = docker_network.id[:12]
         bridge_interface = f"br-{bridge_id}"
         
-        print(f"Deploying Suricata to monitor bridge: {bridge_interface}")
+        logger.info(f"Deploying Suricata to monitor bridge: {bridge_interface}")
 
         # Step 2: Deploy Suricata in host mode to monitor bridge
         suricata_container = client.containers.run(
@@ -1533,16 +1532,14 @@ def deploy_suricata(request, deployment_id):
         
         # Get bridge IP as "Suricata IP" for display purposes
         try:
-            import subprocess
             result = subprocess.run(['ip', 'addr', 'show', bridge_interface], 
                                   capture_output=True, text=True)
-            import re
             match = re.search(r'inet (\d+\.\d+\.\d+\.\d+)', result.stdout)
             suricata_ip = match.group(1) if match else "N/A (Bridge Tap Mode)"
-        except:
+        except Exception:
             suricata_ip = "N/A (Bridge Tap Mode)"
 
-        print(f"Suricata monitoring {bridge_interface}, bridge IP: {suricata_ip}")
+        logger.info(f"Suricata monitoring {bridge_interface}, bridge IP: {suricata_ip}")
 
         # No NAT/routing configuration needed in bridge tap mode
         # Suricata is passively monitoring all traffic on the bridge
@@ -1583,7 +1580,7 @@ def stop_suricata(request, deployment_id):
             network = client.networks.get(deployment.network.name)
             for container in network.containers:
                 if container.id != deployment.suricata_container_id:
-                    print(f"Resetting routing for container: {container.name}")
+                    logger.info(f"Resetting routing for container: {container.name}")
                     container.reload()  # Refresh container info
                     configure_container_routing(container, restore_default=True)
 
@@ -1825,8 +1822,7 @@ def configure_container_routing(container, suricata_ip=None, remove_only=False, 
                 container.exec_run(f"ip route add default via {suricata_ip} dev eth0", privileged=True)
                 # Verify route
                 result = container.exec_run("ip route show default", privileged=True)
-                print(f"Route verification for {container.name}:")
-                print(result.output.decode())
+                logger.debug(f"Route verification for {container.name}: {result.output.decode()}")
             return True
         
         # Try route command instead
@@ -1837,13 +1833,12 @@ def configure_container_routing(container, suricata_ip=None, remove_only=False, 
                 container.exec_run(f"route add default gw {suricata_ip}", privileged=True)
                 # Verify route
                 result = container.exec_run("route -n", privileged=True)
-                print(f"Route verification for {container.name}:")
-                print(result.output.decode())
+                logger.debug(f"Route verification for {container.name}: {result.output.decode()}")
             return True
         
         if not remove_only and suricata_ip:
             # If neither command exists, try to install ip command
-            print(f"Installing iproute2 in container {container.name}")
+            logger.info(f"Installing iproute2 in container {container.name}")
             try:
                 container.exec_run("apt-get update", privileged=True)
                 container.exec_run("apt-get install -y iproute2", privileged=True)
@@ -1858,14 +1853,13 @@ def configure_container_routing(container, suricata_ip=None, remove_only=False, 
             container.exec_run(f"ip route add default via {suricata_ip} dev eth0", privileged=True)
             # Verify route
             result = container.exec_run("ip route show default", privileged=True)
-            print(f"Route verification for {container.name}:")
-            print(result.output.decode())
+            logger.debug(f"Route verification for {container.name}: {result.output.decode()}")
             return True
             
         return False
         
     except Exception as e:
-        print(f"Warning: Failed to configure routing for container {container.name}: {str(e)}")
+        logger.warning(f"Failed to configure routing for container {container.name}: {str(e)}")
         return False
 
 def cleanup_webtop_network(deployment_id):
@@ -1876,7 +1870,7 @@ def cleanup_webtop_network(deployment_id):
     except docker.errors.NotFound:
         pass  # Network doesn't exist or already removed
     except docker.errors.APIError as e:
-        print(f"Warning: Failed to remove webtop network: {str(e)}")
+        logger.warning(f"Failed to remove webtop network: {str(e)}")
 
 # External IP Configuration API Endpoints
 

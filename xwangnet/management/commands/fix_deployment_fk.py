@@ -1,5 +1,4 @@
 from django.core.management.base import BaseCommand
-from django.db import connection
 from xwangnet.models import Deployment, DeployedContainer
 
 class Command(BaseCommand):

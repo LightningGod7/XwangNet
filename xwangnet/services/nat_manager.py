@@ -132,26 +132,54 @@ class NATManager:
             macvlan_interface: Macvlan interface name (optional)
             bridge_interface: Bridge interface name (optional)
         """
+        # Whitelist of allowed tables and chains for security
+        ALLOWED_TABLES = {'nat', 'filter'}
+        ALLOWED_CHAINS = {'PREROUTING', 'POSTROUTING', 'DOCKER-USER', 'FORWARD'}
+        
         for rule_str in rules:
             try:
+                # Validate rule format: must have exactly 3 parts (table, chain, rule)
                 parts = rule_str.split(' ', 2)
-                table = parts[0]
-                chain = parts[1]
-                rule = parts[2]
+                if len(parts) != 3:
+                    logger.warning(f"Invalid rule format (expected 3 parts): {rule_str}")
+                    continue
                 
+                table = parts[0].strip()
+                chain = parts[1].strip()
+                rule = parts[2].strip()
+                
+                # Validate table and chain against whitelist
+                if table not in ALLOWED_TABLES:
+                    logger.warning(f"Invalid table in rule: {table}")
+                    continue
+                
+                if chain not in ALLOWED_CHAINS:
+                    logger.warning(f"Invalid chain in rule: {chain}")
+                    continue
+                
+                # Validate rule components - split and validate each part
+                rule_parts = rule.split()
+                # Basic validation: ensure no shell metacharacters
+                for part in rule_parts:
+                    if any(char in part for char in [';', '&', '|', '`', '$', '(', ')', '<', '>', '\n', '\r']):
+                        logger.warning(f"Potentially unsafe character in rule part: {part}")
+                        raise ValueError("Unsafe character detected")
+                
+                # Build command safely
                 if table == 'nat':
-                    subprocess.run(
-                        ['iptables', '-t', 'nat', '-D', chain] + rule.split(),
-                        capture_output=True
-                    )
+                    cmd = ['iptables', '-t', 'nat', '-D', chain] + rule_parts
                 else:
                     # For filter table (includes DOCKER-USER and FORWARD chains)
-                    subprocess.run(
-                        ['iptables', '-D', chain] + rule.split(),
-                        capture_output=True
-                    )
-            except Exception:
+                    cmd = ['iptables', '-D', chain] + rule_parts
+                
+                subprocess.run(cmd, capture_output=True)
+                
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Failed to parse or validate rule '{rule_str}': {e}")
+                continue
+            except Exception as e:
                 # Best effort rollback - rules may not exist
+                logger.debug(f"Failed to remove rule '{rule_str}': {e}")
                 pass
     
     @staticmethod
@@ -382,14 +410,14 @@ class NATManager:
         """
         try:
             # Check if iptables is available
-            result = subprocess.run(
+            subprocess.run(
                 ['which', 'iptables'],
                 capture_output=True,
                 check=True
             )
             
             # Check if we can list rules (requires root/CAP_NET_ADMIN)
-            result = subprocess.run(
+            subprocess.run(
                 ['iptables', '-L', '-n'],
                 capture_output=True,
                 check=True

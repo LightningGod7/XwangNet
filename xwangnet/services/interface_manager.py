@@ -116,18 +116,18 @@ class InterfaceManager:
         
         Args:
             interface: Interface name
-            preferred_range: Tuple of (min, max) preferred IP range
+            preferred_range: Tuple of (min, max) preferred IP range (currently unused)
             
         Returns:
             str: Assigned IP address or None
         """
-        preferred_range = preferred_range or InterfaceManager.DHCP_PREFERRED_RANGE
+        # Note: preferred_range parameter is reserved for future use
         
         try:
             logger.info(f"Requesting DHCP IP for {interface}")
             
             # Run dhclient
-            result = subprocess.run(
+            subprocess.run(
                 ['dhclient', '-v', interface],
                 capture_output=True,
                 text=True,
