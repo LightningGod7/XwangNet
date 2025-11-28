@@ -44,6 +44,52 @@
                         {{ deployment.network_status }}
                     </span></p>
                     <p>Network is {% if deployment.network.isolated %}isolated{% else %}not isolated{% endif %}</p>
+                    
+                    <!-- External IP Configuration Info -->
+                    {% if deployment.network.use_external_ip and not deployment.network.isolated %}
+                    <div class="alert alert-info mt-3" role="alert" id="external-ip-config-status">
+                        <h6 class="alert-heading">
+                            <i class="bi bi-router me-2"></i>External IP Binding Configuration
+                        </h6>
+                        <hr>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Interface:</strong> 
+                                <span id="interface-name">{{ deployment.network.external_interface|default:"Not assigned" }}</span><br>
+                                <strong>External IP:</strong> 
+                                <span id="external-ip-status">
+                                {% if deployment.network.external_ip %}
+                                    <span class="badge bg-success">{{ deployment.network.external_ip }}</span>
+                                {% else %}
+                                    <span class="badge bg-warning">
+                                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                        Pending DHCP assignment...
+                                    </span>
+                                {% endif %}
+                                </span>
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Mode:</strong> 
+                                {% if deployment.network.create_new_interface %}
+                                    New Interface
+                                    {% if deployment.network.use_dhcp %}(DHCP){% else %}(Static){% endif %}
+                                {% else %}
+                                    Existing Interface
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="mt-2" id="external-ip-access" {% if not deployment.network.external_ip %}style="display: none;"{% endif %}>
+                            <small><i class="bi bi-info-circle"></i> 
+                                Edge device accessible at: 
+                                <a href="http://{{ deployment.network.external_ip }}" target="_blank" class="alert-link" id="external-ip-link">
+                                    http://{{ deployment.network.external_ip }}
+                                </a>
+                            </small>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
                     <div class="network-actions">
                         <button onclick="toggleNetwork('up')" 
                                 class="btn btn-success" 
@@ -69,6 +115,11 @@
                     <p>Status: <span id="suricata-status" class="badge bg-{% if deployment.suricata_status == 'active' %}success{% else %}danger{% endif %}">
                         {{ deployment.suricata_status }}
                     </span></p>
+                    {% if deployment.suricata_status == 'active' %}
+                    <p id="suricata-ip-display" class="mb-2">
+                        <strong>Mode:</strong> Bridge Tap (monitoring {{ deployment.network.name }})
+                    </p>
+                    {% endif %}
                     <div class="suricata-actions">
                         <button onclick="toggleSuricata('deploy')" 
                                 class="btn btn-success" 
@@ -161,11 +212,43 @@
                 <div class="card-body">
                     {% for container in deployment.containers.all %}
                     <div class="container-item mb-4" id="container-{{ container.id }}">
-                        <h5>{{ container.hostname }}</h5>
+                        <h5>
+                            {{ container.hostname }}
+                            {% if container.is_edge_device %}
+                            <span class="badge bg-warning text-dark ms-2">
+                                <i class="bi bi-star-fill"></i> Edge Device
+                            </span>
+                            {% endif %}
+                        </h5>
                         <p>Status: <span class="container-status badge bg-{% if container.status|lower == 'running' %}success{% else %}danger{% endif %}">
                             {{ container.status }}
                         </span></p>
-                        <p id=internal-ip>IP Addr: {{ container.internal_ip }}</p>
+                        
+                        <!-- IP Address Information -->
+                        <div class="mb-2">
+                            <p class="mb-1">
+                                <strong>Internal IP:</strong> <span id="container-ip-{{ container.id }}">{{ container.internal_ip|default:"Not assigned" }}</span>
+                            </p>
+                            {% if container.is_edge_device and deployment.network.external_ip %}
+                            <p class="mb-1">
+                                <strong>External IP:</strong> 
+                                <span class="badge bg-success">{{ deployment.network.external_ip }}</span>
+                                {% if container.edge_accessible %}
+                                <a href="http://{{ deployment.network.external_ip }}" target="_blank" class="btn btn-sm btn-outline-primary ms-2">
+                                    <i class="bi bi-box-arrow-up-right"></i> Access
+                                </a>
+                                {% endif %}
+                            </p>
+                            {% if deployment.network.port_forwarding %}
+                            <p class="mb-1">
+                                <small class="text-muted">
+                                    <i class="bi bi-arrow-left-right"></i> Port Forwarding: {{ deployment.network.port_forwarding }}
+                                </small>
+                            </p>
+                            {% endif %}
+                            {% endif %}
+                        </div>
+                        
                         <div class="d-flex gap-2 mb-2">
                             <div class="btn-group">
                             {% if container.status == 'stopped' %}
@@ -224,6 +307,83 @@
                         </div>
                     </div>
                     {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Deletion Progress Modal -->
+<div class="modal fade" id="deletionProgressModal" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-trash3 me-2"></i>Deleting Deployment
+                </h5>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <p class="text-muted">Please wait while we clean up all resources...</p>
+                </div>
+                
+                <div class="cleanup-progress">
+                    <div class="cleanup-step mb-2" id="step-containers">
+                        <div class="d-flex align-items-center">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            <span>Stopping and removing containers...</span>
+                        </div>
+                    </div>
+                    <div class="cleanup-step mb-2" id="step-suricata">
+                        <div class="d-flex align-items-center text-muted">
+                            <i class="bi bi-hourglass me-2"></i>
+                            <span>Removing Suricata IDS...</span>
+                        </div>
+                    </div>
+                    <div class="cleanup-step mb-2" id="step-nat">
+                        <div class="d-flex align-items-center text-muted">
+                            <i class="bi bi-hourglass me-2"></i>
+                            <span>Removing NAT rules...</span>
+                        </div>
+                    </div>
+                    <div class="cleanup-step mb-2" id="step-dhcp">
+                        <div class="d-flex align-items-center text-muted">
+                            <i class="bi bi-hourglass me-2"></i>
+                            <span>Releasing DHCP leases...</span>
+                        </div>
+                    </div>
+                    <div class="cleanup-step mb-2" id="step-interfaces">
+                        <div class="d-flex align-items-center text-muted">
+                            <i class="bi bi-hourglass me-2"></i>
+                            <span>Removing network interfaces...</span>
+                        </div>
+                    </div>
+                    <div class="cleanup-step mb-2" id="step-networks">
+                        <div class="d-flex align-items-center text-muted">
+                            <i class="bi bi-hourglass me-2"></i>
+                            <span>Removing Docker networks...</span>
+                        </div>
+                    </div>
+                    <div class="cleanup-step mb-2" id="step-database">
+                        <div class="d-flex align-items-center text-muted">
+                            <i class="bi bi-hourglass me-2"></i>
+                            <span>Cleaning up database records...</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mt-3" id="deletion-complete" style="display: none;">
+                    <div class="alert alert-success mb-0">
+                        <i class="bi bi-check-circle-fill me-2"></i>
+                        All resources have been cleaned up successfully!
+                    </div>
+                </div>
+                
+                <div class="mt-3" id="deletion-error" style="display: none;">
+                    <div class="alert alert-danger mb-0">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <span id="deletion-error-message"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -406,7 +566,7 @@ async function containerAction(containerId, action) {
     const statusSpan = containerDiv.querySelector('.container-status');
     const errorDiv = document.getElementById(`container-error-${containerId}`);
     const logsDiv = document.getElementById(`logs-${containerId}`);
-    const ipPara = containerDiv.querySelector("#internal-ip")
+    const ipSpan = document.getElementById(`container-ip-${containerId}`);
     // Hide previous error
     errorDiv.style.display = 'none';
     
@@ -426,7 +586,10 @@ async function containerAction(containerId, action) {
         const data = await response.json();
         
         if (data.status === 'success') {
-            ipPara.innerHTML = data.internal_ip;
+            // Update internal IP if element exists
+            if (ipSpan && data.internal_ip) {
+                ipSpan.textContent = data.internal_ip;
+            }
             statusSpan.textContent = data.container_status;
             statusSpan.className = `container-status badge bg-${data.container_status === 'running' ? 'success' : 'danger'}`;
             
@@ -584,7 +747,60 @@ async function deleteDeployment() {
         return;
     }
     
+    // Show the deletion progress modal
+    const modal = new bootstrap.Modal(document.getElementById('deletionProgressModal'));
+    modal.show();
+    
+    // Helper function to mark step as complete
+    const completeStep = (stepId) => {
+        const step = document.getElementById(stepId);
+        const content = step.querySelector('div');
+        content.innerHTML = '<i class="bi bi-check-circle-fill text-success me-2"></i><span>Complete</span>';
+        content.classList.remove('text-muted');
+    };
+    
+    // Helper function to mark step as in progress
+    const startStep = (stepId) => {
+        const step = document.getElementById(stepId);
+        const content = step.querySelector('div');
+        
+        // Store original text in data attribute if not already present
+        let originalText = step.dataset.stepText;
+        if (!originalText) {
+            const span = content.querySelector('span');
+            originalText = span ? span.textContent : '';
+            step.dataset.stepText = originalText;
+        }
+        
+        content.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status"></span><span>${originalText}</span>`;
+        content.classList.remove('text-muted');
+    };
+    
     try {
+        // Simulate progress through the steps
+        startStep('step-containers');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        completeStep('step-containers');
+        
+        startStep('step-suricata');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        completeStep('step-suricata');
+        
+        startStep('step-nat');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        completeStep('step-nat');
+        
+        startStep('step-dhcp');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        completeStep('step-dhcp');
+        
+        startStep('step-interfaces');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        completeStep('step-interfaces');
+        
+        startStep('step-networks');
+        
+        // Actually make the deletion request
         const response = await fetch(`/deployment/${deploymentId}/`, {
             method: 'DELETE',
             headers: {
@@ -592,14 +808,34 @@ async function deleteDeployment() {
             }
         });
         
+        completeStep('step-networks');
+        startStep('step-database');
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
         if (response.ok) {
-            window.location.href = '/deployments/';
+            completeStep('step-database');
+            
+            // Show completion message
+            document.getElementById('deletion-complete').style.display = 'block';
+            
+            // Redirect after a short delay
+            setTimeout(() => {
+                window.location.href = '/deployments/';
+            }, 1500);
         } else {
             const data = await response.json();
-            throw new Error(data.message);
+            throw new Error(data.message || 'Failed to delete deployment');
         }
     } catch (error) {
-        showAlert('error', `Failed to delete deployment: ${error.message}`);
+        // Show error in modal
+        document.getElementById('deletion-error-message').textContent = error.message;
+        document.getElementById('deletion-error').style.display = 'block';
+        
+        // Allow manual close after error
+        setTimeout(() => {
+            modal._element.setAttribute('data-bs-backdrop', 'true');
+            modal._element.setAttribute('data-bs-keyboard', 'true');
+        }, 1000);
     }
 }
 
@@ -692,6 +928,99 @@ window.addEventListener('beforeunload', () => {
         clearInterval(suricataLogPolling);
     }
 });
+
+// Poll for IP leasing status updates
+async function checkIPLeasingStatus() {
+    const externalIpStatus = document.getElementById('external-ip-status');
+    const interfaceName = document.getElementById('interface-name');
+    const externalIpAccess = document.getElementById('external-ip-access');
+    const externalIpLink = document.getElementById('external-ip-link');
+    
+    if (!externalIpStatus) return; // Not using external IP
+    
+    // Only poll if IP is still pending
+    if (externalIpStatus.textContent.includes('Pending')) {
+        try {
+            const response = await fetch(`/api/deployment/{{ deployment.id }}/`, {
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            });
+            const data = await response.json();
+            
+            if (data.network && data.network.external_ip) {
+                // IP has been assigned
+                externalIpStatus.innerHTML = `<span class="badge bg-success">${data.network.external_ip}</span>`;
+                
+                if (data.network.external_interface) {
+                    interfaceName.textContent = data.network.external_interface;
+                }
+                
+                // Show access link
+                externalIpLink.href = `http://${data.network.external_ip}`;
+                externalIpLink.textContent = `http://${data.network.external_ip}`;
+                externalIpAccess.style.display = 'block';
+                
+                // Stop polling
+                if (ipPollingInterval) {
+                    clearInterval(ipPollingInterval);
+                }
+            }
+        } catch (error) {
+            console.error('Error checking IP status:', error);
+        }
+    }
+}
+
+// Start polling on page load if needed
+let ipPollingInterval = null;
+if (document.getElementById('external-ip-status')?.textContent.includes('Pending')) {
+    ipPollingInterval = setInterval(checkIPLeasingStatus, 2000); // Check every 2 seconds
+    
+    // Clean up on page unload
+    window.addEventListener('beforeunload', () => {
+        if (ipPollingInterval) {
+            clearInterval(ipPollingInterval);
+        }
+    });
+}
+
+// Poll for container IP updates
+async function checkContainerIPs() {
+    try {
+        const response = await fetch(`/api/deployment/{{ deployment.id }}/`);
+        const data = await response.json();
+        
+        if (data.status === 'success' && data.containers) {
+            data.containers.forEach(container => {
+                const ipSpan = document.getElementById(`container-ip-${container.id}`);
+                if (ipSpan && container.internal_ip) {
+                    const currentText = ipSpan.textContent.trim();
+                    if (currentText === 'Not assigned' || currentText !== container.internal_ip) {
+                        ipSpan.textContent = container.internal_ip;
+                        ipSpan.classList.add('text-success');
+                        ipSpan.classList.add('fw-bold');
+                    }
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error checking container IPs:', error);
+    }
+}
+
+// Poll every 3 seconds for IP updates
+let containerIpPolling = setInterval(checkContainerIPs, 3000);
+
+// Clean up on page unload
+window.addEventListener('beforeunload', () => {
+    if (containerIpPolling) {
+        clearInterval(containerIpPolling);
+    }
+});
+
+// Initial check
+checkContainerIPs();
 </script>
 
 <style>

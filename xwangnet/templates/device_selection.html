@@ -6,10 +6,45 @@
 <div class="container">
     <h1 class="mb-4">Select Devices for Network</h1>
     
+    <!-- Edge Device Selection Info -->
+    <div class="alert alert-info mb-4" id="edge-device-info" style="display: none;">
+        <h6 class="alert-heading">
+            <i class="bi bi-router me-2"></i>Edge Device Selection
+        </h6>
+        <p class="mb-0">
+            Select <strong>one device</strong> to be the edge device (externally accessible honeypot). 
+            This option will be available after you configure a non-isolated network in the next step.
+        </p>
+    </div>
+    
     <form method="post" class="mb-4" id="deviceForm">
         {% csrf_token %}
+        
+        <!-- Selected Devices Summary -->
+        <div class="card mb-4" id="selected-summary" style="display: none;">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Selected Devices</h5>
+            </div>
+            <div class="card-body">
+                <div id="selected-devices-list"></div>
+                <div class="mt-3">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-star me-2"></i>Designate Edge Device (Optional)
+                    </label>
+                    <p class="text-muted small">
+                        Select which device should be exposed to the network. Only available for non-isolated networks.
+                        <strong>Maximum ONE edge device per deployment.</strong>
+                    </p>
+                    <select class="form-select" id="edge-device-select" name="edge_device">
+                        <option value="">None (Isolated Network)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
         <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
             {% for device in form.devices.field.queryset %}
+            {% if device.name != 'webtop' %}
             <div class="col">
                 <div class="card h-100">
                     <div class="card-body">
@@ -18,15 +53,13 @@
                         <p class="card-text">{{ device.description }}</p>
                         <div class="device-counter">
                             <button type="button" class="btn btn-sm btn-secondary" onclick="decrementCount({{ device.id }})">-</button>
-                            {% if device.name == 'webtop' %}
-                                <input type="number" class="form-control form-control-sm device-count" 
-                                   id="count_{{ device.id }}" name="device_count_{{ device.id }}" 
-                                   value="1" min="1" style="width: 60px; display: inline-block;">
-                           {% else %}
-                                <input type="number" class="form-control form-control-sm device-count" 
-                                   id="count_{{ device.id }}" name="device_count_{{ device.id }}" 
-                                   value="0" min="0" style="width: 60px; display: inline-block;">
-                           {% endif %}
+                            <input type="number" class="form-control form-control-sm device-count" 
+                                   id="count_{{ device.id }}" 
+                                   name="device_count_{{ device.id }}"
+                                   data-device-name="{{ device.name }}"
+                                   data-device-id="{{ device.id }}"
+                                   value="0" min="0" style="width: 60px; display: inline-block;"
+                                   onchange="updateSelectedDevices()">
                             <button type="button" class="btn btn-sm btn-secondary" onclick="incrementCount({{ device.id }})">+</button>
                         </div>
                     </div>
@@ -35,6 +68,7 @@
                     </div>
                 </div>
             </div>
+            {% endif %}
             {% empty %}
             <div class="col-12">
                 <div class="alert alert-info">
@@ -44,6 +78,13 @@
             </div>
             {% endfor %}
         </div>
+        
+        <!-- Hidden input to store webtop device ID for auto-add -->
+        {% for device in form.devices.field.queryset %}
+        {% if device.name == 'webtop' %}
+        <input type="hidden" id="webtop_device_id" value="{{ device.id }}" data-device-name="webtop">
+        {% endif %}
+        {% endfor %}
 
         <div class="mt-4">
             <button type="submit" class="btn btn-primary">Continue to Network Configuration</button>
@@ -55,6 +96,7 @@
 function incrementCount(deviceId) {
     const input = document.getElementById(`count_${deviceId}`);
     input.value = parseInt(input.value) + 1;
+    updateSelectedDevices();
 }
 
 function decrementCount(deviceId) {
@@ -62,8 +104,75 @@ function decrementCount(deviceId) {
     const currentValue = parseInt(input.value);
     if (currentValue > 0) {
         input.value = currentValue - 1;
+        updateSelectedDevices();
     }
 }
+
+function updateSelectedDevices() {
+    const selectedDevicesList = document.getElementById('selected-devices-list');
+    const edgeDeviceSelect = document.getElementById('edge-device-select');
+    const selectedSummary = document.getElementById('selected-summary');
+    
+    const deviceInputs = document.querySelectorAll('.device-count');
+    const selectedDevices = [];
+    
+    // Build list of selected devices with instances
+    deviceInputs.forEach(input => {
+        const count = parseInt(input.value);
+        if (count > 0) {
+            const deviceName = input.dataset.deviceName;
+            const deviceId = input.dataset.deviceId;
+            
+            for (let i = 1; i <= count; i++) {
+                selectedDevices.push({
+                    id: deviceId,
+                    name: deviceName,
+                    instance: i,
+                    displayName: count > 1 ? `${deviceName}-${i}` : deviceName
+                });
+            }
+        }
+    });
+    
+    // Show/hide selected summary
+    if (selectedDevices.length > 0) {
+        selectedSummary.style.display = 'block';
+        
+        // Build device list
+        let listHTML = '<ul class="list-group">';
+        selectedDevices.forEach(device => {
+            listHTML += `<li class="list-group-item">${device.displayName}</li>`;
+        });
+        listHTML += '</ul>';
+        selectedDevicesList.innerHTML = listHTML;
+        
+        // Build edge device dropdown options
+        const currentValue = edgeDeviceSelect.value;
+        edgeDeviceSelect.innerHTML = '<option value="">None (Isolated Network)</option>';
+        
+        selectedDevices.forEach((device, index) => {
+            // Skip webtop devices
+            if (device.name.toLowerCase() === 'webtop') {
+                return;
+            }
+            
+            const option = document.createElement('option');
+            option.value = device.displayName;
+            option.textContent = device.displayName;
+            if (device.displayName === currentValue) {
+                option.selected = true;
+            }
+            edgeDeviceSelect.appendChild(option);
+        });
+    } else {
+        selectedSummary.style.display = 'none';
+    }
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    updateSelectedDevices();
+});
 </script>
 
 <style>

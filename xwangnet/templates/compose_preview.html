@@ -2,27 +2,89 @@
 
 {% block content %}
 <div class="container">
-    <h1>Deployment Information</h1>
+    <h1>Deployment Preview</h1>
     
+    <!-- Network Configuration Summary -->
     <div class="card mb-4">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">Network Configuration</h5>
+        </div>
+        <div class="card-body">
+            <p><strong>Network Name:</strong> {{ network.name }}</p>
+            <p><strong>Mode:</strong> {% if network.isolated %}Isolated{% else %}Non-Isolated (External IP Binding){% endif %}</p>
+            {% if network.subnet %}
+            <p><strong>Subnet:</strong> {{ network.subnet }}</p>
+            <p><strong>Gateway:</strong> {{ network.gateway }}</p>
+            {% endif %}
+            {% if network.use_external_ip %}
+            <p><strong>External IP:</strong> 
+                {% if network.external_ip %}
+                    {{ network.external_ip }}
+                {% else %}
+                    Will be assigned via DHCP
+                {% endif %}
+            </p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Selected Devices Summary -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">Selected Devices</h5>
+        </div>
+        <div class="card-body">
+            <ul class="list-group">
+                {% for device in selected_devices %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ device.name }}
+                    {% if edge_device and device.name == edge_device %}
+                    <span class="badge bg-warning text-dark">
+                        <i class="bi bi-star-fill me-1"></i>Edge Device
+                    </span>
+                    {% endif %}
+                </li>
+                {% endfor %}
+            </ul>
+            {% if edge_device %}
+            <div class="alert alert-info mt-3 mb-0">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>{{ edge_device }}</strong> is designated as the edge device and will be accessible from the network.
+            </div>
+            {% else %}
+            <div class="alert alert-secondary mt-3 mb-0">
+                <i class="bi bi-info-circle me-2"></i>
+                No edge device designated. All devices will be in isolated network.
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Deployment Form -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Deployment Information</h5>
+        </div>
         <div class="card-body">
             <form id="deploymentForm" class="needs-validation" novalidate>
                 {% csrf_token %}
                 <div class="mb-3">
                     <label for="deployment_name" class="form-label">Deployment Name</label>
-                    <input type="text" class="form-control" id="deployment_name" name="deployment_name" required>
+                    <input type="text" class="form-control" id="deployment_name" name="deployment_name" value="{{ network.name }}-deployment-{{ selected_devices|length }}-nodes" required>
                     <div class="invalid-feedback">Please provide a deployment name.</div>
                 </div>
                 <div class="mb-3">
                     <label for="deployment_description" class="form-label">Description</label>
-                    <textarea class="form-control" id="deployment_description" name="deployment_description" rows="3" required></textarea>
+                    <textarea class="form-control" id="deployment_description" name="deployment_description" rows="3" required>Deployment with {{ selected_devices|length }} node(s) on network {{ network.name }}{% if network.isolated %} (isolated){% else %} (external access){% endif %}</textarea>
                     <div class="invalid-feedback">Please provide a deployment description.</div>
                 </div>
             </form>
         </div>
     </div>
-    <div class="controls">
-        <button onclick="deployCompose()" class="btn btn-success">Deploy</button>
+    
+    <div class="d-flex justify-content-between mb-4">
+        <a href="{% url 'network_config' %}" class="btn btn-secondary">Back to Network Config</a>
+        <button onclick="deployCompose()" class="btn btn-success">Create Deployment</button>
     </div>
     
     <div id="status" class="mt-4"></div>

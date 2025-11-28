@@ -39,6 +39,14 @@ class NetworkConfiguration(models.Model):
     gateway = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=False)
+    
+    # External IP binding configuration (for non-isolated mode)
+    use_external_ip = models.BooleanField(default=False, help_text="Bind edge device to external IP")
+    external_interface = models.CharField(max_length=50, blank=True, null=True, help_text="Interface name (e.g., macvlan0)")
+    external_ip = models.GenericIPAddressField(blank=True, null=True, help_text="External IP address")
+    create_new_interface = models.BooleanField(default=False, help_text="Create new macvlan interface")
+    use_dhcp = models.BooleanField(default=True, help_text="Use DHCP for IP assignment")
+    port_forwarding = models.TextField(blank=True, null=True, help_text="Port forwarding rules (e.g., 80:8080,443:8443)")
 
 class Deployment(models.Model):
     name = models.CharField(max_length=255, unique=True)
@@ -61,6 +69,27 @@ class DeployedContainer(models.Model):
     hostname = models.CharField(max_length=255, null=True, blank=True)  # Added for webtop proxy
     created_at = models.DateTimeField(auto_now_add=True)
     internal_ip = models.GenericIPAddressField(null=True, blank=True)
+    
+    # Edge device configuration
+    is_edge_device = models.BooleanField(default=False, help_text="Designated as edge device for external access")
+    edge_accessible = models.BooleanField(default=False, help_text="NAT configured and externally accessible")
 
     def __str__(self):
         return f"{self.deployment.name} - {self.device.name}"
+
+class EdgeDeviceNATRule(models.Model):
+    """Tracks NAT rules and interface configuration for edge devices"""
+    deployment = models.ForeignKey(Deployment, on_delete=models.CASCADE, related_name='nat_rules')
+    edge_container = models.ForeignKey(DeployedContainer, on_delete=models.CASCADE, related_name='nat_rules')
+    macvlan_interface = models.CharField(max_length=50, help_text="Macvlan interface name")
+    lan_ip = models.GenericIPAddressField(help_text="External LAN IP address")
+    internal_ip = models.GenericIPAddressField(help_text="Internal Docker container IP")
+    iptables_rules = models.JSONField(default=list, help_text="List of active iptables rules")
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['deployment', 'edge_container']
+    
+    def __str__(self):
+        return f"NAT Rule: {self.lan_ip} → {self.internal_ip} ({self.deployment.name})"

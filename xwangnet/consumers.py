@@ -4,7 +4,10 @@ import docker
 import asyncio
 import paramiko
 import os
+import logging
 from django.conf import settings
+
+logger = logging.getLogger(__name__)
 
 class ShellConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
@@ -42,7 +45,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
                 await self.setup_chroot_shell(container)
 
         except Exception as e:
-            print(f"Connection error: {e}")
+            logger.error(f"Connection error: {e}")
             await self.close()
 
     async def setup_docker_shell(self, container):
@@ -70,11 +73,11 @@ class ShellConsumer(AsyncWebsocketConsumer):
             # Start reading output in background
             self.read_task = asyncio.create_task(self.read_docker_output())
         except Exception as e:
-            print(f"Error setting up docker shell: {e}")
+            logger.error(f"Error setting up docker shell: {e}")
             if self.socket:
                 try:
                     self.socket.close()
-                except:
+                except Exception:
                     pass
                 self.socket = None
             await self.close()
@@ -86,7 +89,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
             container_ip = next(iter(networks))['IPAddress']
             
             if not container_ip:
-                print(f"No IP address found for container")
+                logger.warning("No IP address found for container")
                 await self.close()
                 return
 
@@ -102,11 +105,11 @@ class ShellConsumer(AsyncWebsocketConsumer):
                     timeout=10
                 )
             except paramiko.ssh_exception.AuthenticationException:
-                print("Authentication failed")
+                logger.warning("Authentication failed for QEMU")
                 await self.close()
                 return
             except Exception as e:
-                print(f"SSH connection error for QEMU: {str(e)}")
+                logger.error(f"SSH connection error for QEMU: {str(e)}")
                 await self.close()
                 return
 
@@ -114,7 +117,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
             try:
                 stdin, stdout, stderr = self.qemu_ssh_client.exec_command("nochroot")
             except Exception as e:
-                print(f"Error executing nochroot command: {str(e)}")
+                logger.error(f"Error executing nochroot command: {str(e)}")
                 await self.close()
                 return
             
@@ -123,7 +126,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
                 self.qemu_channel = self.qemu_ssh_client.invoke_shell(term='xterm')
                 self.qemu_channel.setblocking(0)
             except Exception as e:
-                print(f"Error setting up shell channel: {str(e)}")
+                logger.error(f"Error setting up shell channel: {str(e)}")
                 await self.close()
                 return
 
@@ -131,7 +134,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
             asyncio.create_task(self.read_qemu_output())
             
         except Exception as e:
-            print(f"Error in setup_qemu_shell: {str(e)}")
+            logger.error(f"Error in setup_qemu_shell: {str(e)}")
             if self.qemu_ssh_client:
                 self.qemu_ssh_client.close()
             await self.close()
@@ -143,7 +146,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
             container_ip = next(iter(networks))['IPAddress']
             
             if not container_ip:
-                print(f"No IP address found for container")
+                logger.warning("No IP address found for container")
                 await self.close()
                 return
 
@@ -159,11 +162,11 @@ class ShellConsumer(AsyncWebsocketConsumer):
                     timeout=10
                 )
             except paramiko.ssh_exception.AuthenticationException:
-                print("Authentication failed")
+                logger.warning("Authentication failed for Chroot")
                 await self.close()
                 return
             except Exception as e:
-                print(f"SSH connection error for Chroot: {str(e)}")
+                logger.error(f"SSH connection error for Chroot: {str(e)}")
                 await self.close()
                 return
 
@@ -177,12 +180,12 @@ class ShellConsumer(AsyncWebsocketConsumer):
                     await asyncio.sleep(0.1)
                 # Execute chroot command immediately after connection
                 chroot_cmd = "chroot /root/rootfs /bin/sh -i\n"
-                print(f"Sending chroot command: {chroot_cmd}")
+                logger.debug(f"Sending chroot command: {chroot_cmd}")
                 self.chroot_channel.send(chroot_cmd)
                 await asyncio.sleep(0.5)  # Wait for command to be processed
                 
             except Exception as e:
-                print(f"Error setting up shell channel: {str(e)}")
+                logger.error(f"Error setting up shell channel: {str(e)}")
                 await self.close()
                 return
 
@@ -190,7 +193,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
             asyncio.create_task(self.read_chroot_output())
             
         except Exception as e:
-            print(f"Error in setup_chroot_shell: {str(e)}")
+            logger.error(f"Error in setup_chroot_shell: {str(e)}")
             if self.chroot_ssh_client:
                 self.chroot_ssh_client.close()
             await self.close()
@@ -207,29 +210,29 @@ class ShellConsumer(AsyncWebsocketConsumer):
         if self.socket:
             try:
                 self.socket.close()
-            except:
+            except Exception:
                 pass
             self.socket = None
 
         if self.qemu_channel:
             try:
                 self.qemu_channel.close()
-            except:
+            except Exception:
                 pass
         if self.qemu_ssh_client:
             try:
                 self.qemu_ssh_client.close()
-            except:
+            except Exception:
                 pass
         if self.chroot_channel:
             try:
                 self.chroot_channel.close()
-            except:
+            except Exception:
                 pass
         if self.chroot_ssh_client:
             try:
                 self.chroot_ssh_client.close()
-            except:
+            except Exception:
                 pass
 
     async def receive(self, text_data):
@@ -254,7 +257,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
                     try:
                         self.socket.send(command.encode())
                     except Exception as e:
-                        print(f"Error sending to docker socket: {e}")
+                        logger.error(f"Error sending to docker socket: {e}")
                         await self.close()
                 elif self.shell_type == 'qemu' and self.qemu_channel:
                     self.qemu_channel.send(command)
@@ -262,7 +265,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
                     self.chroot_channel.send(command)
                 
         except Exception as e:
-            print(f"Error handling message: {e}")
+            logger.error(f"Error handling message: {e}")
 
     async def read_docker_output(self):
         try:
@@ -280,11 +283,11 @@ class ShellConsumer(AsyncWebsocketConsumer):
                 except BlockingIOError:
                     await asyncio.sleep(0.01)
                 except Exception as e:
-                    print(f"Error reading docker output: {e}")
+                    logger.error(f"Error reading docker output: {e}")
                     break
 
         except Exception as e:
-            print(f"Error in docker output loop: {e}")
+            logger.error(f"Error in docker output loop: {e}")
         finally:
             # Ensure we close the connection when the read loop ends
             await self.close()
@@ -299,21 +302,21 @@ class ShellConsumer(AsyncWebsocketConsumer):
                 await asyncio.sleep(0.01)
 
         except Exception as e:
-            print(f"Error in QEMU output loop: {e}")
+            logger.error(f"Error in QEMU output loop: {e}")
             await self.close()
 
     async def read_chroot_output(self):
         try:
-            print("Starting chroot output reader")
+            logger.debug("Starting chroot output reader")
             while True:
                 if self.chroot_channel and self.chroot_channel.recv_ready():
                     output = self.chroot_channel.recv(1024)
                     if output:
                         decoded_output = output.decode()
-                        print(f"Received chroot output: {decoded_output}")
+                        logger.debug(f"Received chroot output: {decoded_output}")
                         await self.send(text_data=decoded_output)
                 await asyncio.sleep(0.01)
 
         except Exception as e:
-            print(f"Error in Chroot output loop: {str(e)}")
+            logger.error(f"Error in Chroot output loop: {str(e)}")
             await self.close() 
