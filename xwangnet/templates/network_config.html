@@ -43,7 +43,11 @@
                 <div id="external-ip-config" style="display: none;">
                     <div class="d-flex align-items-center mb-3">
                         <h5 class="mb-0">External IP Configuration</h5>
-                        <button type="button" class="btn btn-link p-0 ms-2" onclick="toggleWarningInfo()" title="Show/hide important information">
+                        <button type="button" class="btn btn-link p-0 ms-2" onclick="toggleWarningInfo()" 
+                                aria-label="Toggle critical warning information"
+                                aria-expanded="false"
+                                id="warning-toggle-btn"
+                                title="Show/hide important information">
                             <i class="bi bi-exclamation-triangle-fill" style="font-size: 1.2rem; color: #dc3545;"></i>
                         </button>
                         <button type="button" class="btn btn-link p-0 ms-1" data-bs-toggle="modal" data-bs-target="#externalIpInfoModal" title="Learn more about external IP binding">
@@ -326,10 +330,13 @@
     // Toggle warning alert visibility
     function toggleWarningInfo() {
         const warningAlert = document.getElementById('warning-alert');
+        const toggleBtn = document.getElementById('warning-toggle-btn');
         if (warningAlert.style.display === 'none') {
             warningAlert.style.display = 'block';
+            toggleBtn.setAttribute('aria-expanded', 'true');
         } else {
             warningAlert.style.display = 'none';
+            toggleBtn.setAttribute('aria-expanded', 'false');
         }
     }
 

@@ -9,7 +9,7 @@ class NATManager:
     """Manages iptables NAT rules for external IP binding"""
     
     @staticmethod
-    def configure_full_port_nat(src_ip, dst_ip, macvlan_interface, bridge_interface, parent_interface='ens18'):
+    def configure_full_port_nat(src_ip, dst_ip, macvlan_interface, bridge_interface):
         """Configure NAT for all ports from external IP to container IP
         
         This implements the complete working NAT configuration discovered through testing:
@@ -24,7 +24,6 @@ class NATManager:
             dst_ip: Internal Docker container IP
             macvlan_interface: Macvlan interface name (e.g., macvlan0)
             bridge_interface: Docker bridge interface (e.g., br-431706091c0d)
-            parent_interface: Parent interface (default: ens18)
             
         Returns:
             dict: Result with success status and list of applied rules
@@ -160,8 +159,9 @@ class NATManager:
                 # Validate rule components - split and validate each part
                 rule_parts = rule.split()
                 # Basic validation: ensure no shell metacharacters
+                UNSAFE_CHARS = {';', '&', '|', '`', '$', '(', ')', '<', '>', '\n', '\r', '\t'}
                 for part in rule_parts:
-                    if any(char in part for char in [';', '&', '|', '`', '$', '(', ')', '<', '>', '\n', '\r']):
+                    if any(char in UNSAFE_CHARS for char in part):
                         logger.warning(f"Potentially unsafe character in rule part: {part}")
                         raise ValueError("Unsafe character detected")
                 
@@ -180,10 +180,9 @@ class NATManager:
             except Exception as e:
                 # Best effort rollback - rules may not exist
                 logger.debug(f"Failed to remove rule '{rule_str}': {e}")
-                pass
     
     @staticmethod
-    def remove_nat_rules(src_ip, dst_ip, macvlan_interface, bridge_interface, parent_interface='ens18'):
+    def remove_nat_rules(src_ip, dst_ip, macvlan_interface, bridge_interface):
         """Remove all 5 NAT rules for given IP pair
         
         Args:
@@ -191,7 +190,6 @@ class NATManager:
             dst_ip: Internal Docker container IP
             macvlan_interface: Macvlan interface name
             bridge_interface: Docker bridge interface
-            parent_interface: Parent interface (default: ens18)
             
         Returns:
             dict: Result with success status

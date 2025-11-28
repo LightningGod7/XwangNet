@@ -763,7 +763,16 @@ async function deleteDeployment() {
     const startStep = (stepId) => {
         const step = document.getElementById(stepId);
         const content = step.querySelector('div');
-        content.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status"></span><span>${content.querySelector('span').textContent}</span>`;
+        
+        // Store original text in data attribute if not already present
+        let originalText = step.dataset.stepText;
+        if (!originalText) {
+            const span = content.querySelector('span');
+            originalText = span ? span.textContent : '';
+            step.dataset.stepText = originalText;
+        }
+        
+        content.innerHTML = `<span class="spinner-border spinner-border-sm me-2" role="status"></span><span>${originalText}</span>`;
         content.classList.remove('text-muted');
     };
     

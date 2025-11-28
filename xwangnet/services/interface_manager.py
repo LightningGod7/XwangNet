@@ -83,7 +83,7 @@ class InterfaceManager:
         
         # Validate interface name: Linux interface names are up to 15 chars, alphanumeric, underscore, dash
         if not re.match(r'^[a-zA-Z0-9_-]{1,15}$', name):
-            raise ValueError(f"Invalid interface name: {name!r}. Must be 1-15 chars, alphanumeric, underscore, or dash.")
+            raise ValueError("Invalid interface name format. Must be 1-15 alphanumeric characters, underscores, or dashes.")
         
         try:
             logger.info(f"Creating macvlan interface {name} on parent {parent}")

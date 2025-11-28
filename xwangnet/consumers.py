@@ -77,7 +77,7 @@ class ShellConsumer(AsyncWebsocketConsumer):
             if self.socket:
                 try:
                     self.socket.close()
-                except:
+                except Exception:
                     pass
                 self.socket = None
             await self.close()
@@ -210,29 +210,29 @@ class ShellConsumer(AsyncWebsocketConsumer):
         if self.socket:
             try:
                 self.socket.close()
-            except:
+            except Exception:
                 pass
             self.socket = None
 
         if self.qemu_channel:
             try:
                 self.qemu_channel.close()
-            except:
+            except Exception:
                 pass
         if self.qemu_ssh_client:
             try:
                 self.qemu_ssh_client.close()
-            except:
+            except Exception:
                 pass
         if self.chroot_channel:
             try:
                 self.chroot_channel.close()
-            except:
+            except Exception:
                 pass
         if self.chroot_ssh_client:
             try:
                 self.chroot_ssh_client.close()
-            except:
+            except Exception:
                 pass
 
     async def receive(self, text_data):

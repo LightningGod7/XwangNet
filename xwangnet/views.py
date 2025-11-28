@@ -22,6 +22,7 @@ import time
 import logging
 import subprocess
 import ipaddress
+from collections import deque
 
 client = docker.from_env()
 logger = logging.getLogger(__name__)
@@ -178,7 +179,7 @@ def network_config(request):
                 
                 # Validate that interface_option is provided
                 if not interface_option or interface_option not in ['existing', 'new']:
-                    messages.error(request, 'Please select an interface configuration option (existing or new interface)')
+                    messages.error(request, 'External IP configuration is required for non-isolated networks. Please select either an existing interface or create a new one.')
                     return render(request, 'network_config.html', {'form': form})
                 
                 # Check if edge device is designated
@@ -902,7 +903,7 @@ def container_action(request, container_id):
                             health = docker_container.attrs.get('State', {}).get('Health', {}).get('Status')
                             if health == 'healthy' or health is None:  # None means no health check defined
                                 break
-                        except:
+                        except Exception:
                             pass
                     time.sleep(retry_interval)
                 else:  # Loop completed without break - container not ready
@@ -1565,7 +1566,7 @@ def deploy_suricata(request, deployment_id):
         try:
             if 'suricata_container' in locals():
                 suricata_container.remove(force=True)
-        except:
+        except Exception:
             pass
             
         return JsonResponse({
@@ -1643,10 +1644,9 @@ def get_suricata_logs(request, deployment_id):
         
         formatted_logs = []
         
-        # Read last 100 lines of eve.json
+        # Read last 100 lines of eve.json efficiently
         with open(eve_log, 'r') as f:
-            lines = f.readlines()
-            recent_lines = lines[-100:] if len(lines) > 100 else lines
+            recent_lines = deque(f, maxlen=100)
         
         for line in recent_lines:
             try:
@@ -1663,7 +1663,7 @@ def get_suricata_logs(request, deployment_id):
                 try:
                     src_in_network = ip_module.ip_address(src_ip) in network_subnet
                     dest_in_network = ip_module.ip_address(dest_ip) in network_subnet
-                except:
+                except Exception:
                     continue  # Skip invalid IPs
                 
                 if not (src_in_network or dest_in_network):
@@ -1688,9 +1688,10 @@ def get_suricata_logs(request, deployment_id):
                 else:
                     direction = "←"  # Inbound
                 
-                # Build log line
-                port_info = f":{src_port}→:{dest_port}" if src_port and dest_port else ""
-                log_line = f"{timestamp} | {src_ip}{port_info if src_port else ''} {direction} {dest_ip}{port_info if dest_port else ''} | {proto} | ↑{pkts_to}↓{pkts_from} pkts | ↑{bytes_to}↓{bytes_from} bytes"
+                # Build log line with proper port formatting
+                src_display = f"{src_ip}:{src_port}" if src_port else src_ip
+                dest_display = f"{dest_ip}:{dest_port}" if dest_port else dest_ip
+                log_line = f"{timestamp} | {src_display} {direction} {dest_display} | {proto} | ↑{pkts_to}↓{pkts_from} pkts | ↑{bytes_to}↓{bytes_from} bytes"
                 formatted_logs.append(log_line)
                 
             except json.JSONDecodeError:
@@ -1781,7 +1782,7 @@ def get_monitoring_status(request, deployment_id):
                         elif event.get('event_type') == 'alert':
                             stats['alerts'] += 1
                             
-                    except:
+                    except Exception:
                         continue
         
         # Get live container logs for additional info
@@ -1848,10 +1849,10 @@ def configure_container_routing(container, suricata_ip=None, remove_only=False, 
             try:
                 container.exec_run("apt-get update", privileged=True)
                 container.exec_run("apt-get install -y iproute2", privileged=True)
-            except:
+            except Exception:
                 try:
                     container.exec_run("apk add --no-cache iproute2", privileged=True)
-                except:
+                except Exception:
                     container.exec_run("yum install -y iproute", privileged=True)
             
             # Try again with ip command
