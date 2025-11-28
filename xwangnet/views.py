@@ -240,7 +240,13 @@ def network_config(request):
                         network.use_dhcp = False
                         manual_ip = request.POST.get('external_ip')
                         if manual_ip:
-                            network.external_ip = manual_ip
+                            try:
+                                # Validate IP address
+                                ipaddress.ip_address(manual_ip)
+                                network.external_ip = manual_ip
+                            except ValueError:
+                                messages.error(request, 'Invalid IP address format')
+                                return render(request, 'network_config.html', {'form': form})
                         else:
                             messages.error(request, 'Manual IP address is required')
                             return render(request, 'network_config.html', {'form': form})
@@ -1016,7 +1022,7 @@ def container_action(request, container_id):
                             if health == 'healthy' or health is None:  # None means no health check defined
                                 container_ready = True
                                 break
-                        except:
+                        except Exception:
                             pass
                     time.sleep(retry_interval)
                 
