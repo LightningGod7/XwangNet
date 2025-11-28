@@ -49,53 +49,52 @@ class NATManager:
         try:
             logger.info(f"Configuring full port NAT: {src_ip} ({macvlan_interface}) → {dst_ip}")
             
-            # Rule 1: DNAT - Incoming: Route external traffic to container
-            subprocess.run(
-                ['iptables', '-t', 'nat', '-A', 'PREROUTING', '-d', src_ip, '-j', 'DNAT', '--to-destination', dst_ip],
-                check=True,
-                capture_output=True
-            )
-            applied_rules.append(f"nat PREROUTING -d {src_ip} -j DNAT --to-destination {dst_ip}")
-            logger.info(f"✓ Applied DNAT rule")
-            
-            # Rule 2: SNAT - Outgoing: Make replies appear from macvlan IP
-            subprocess.run(
-                ['iptables', '-t', 'nat', '-A', 'POSTROUTING', '-s', dst_ip, '-j', 'SNAT', '--to-source', src_ip],
-                check=True,
-                capture_output=True
-            )
-            applied_rules.append(f"nat POSTROUTING -s {dst_ip} -j SNAT --to-source {src_ip}")
-            logger.info(f"✓ Applied SNAT rule")
-            
-            # Rule 3: DOCKER-USER - Accept incoming to container
-            subprocess.run(
-                ['iptables', '-I', 'DOCKER-USER', '-d', dst_ip, '-j', 'ACCEPT'],
-                check=True,
-                capture_output=True
-            )
-            applied_rules.append(f"filter DOCKER-USER -d {dst_ip} -j ACCEPT")
-            logger.info(f"✓ Applied DOCKER-USER incoming rule")
-            
-            # Rule 4: DOCKER-USER - Force outbound via macvlan0 only
-            subprocess.run(
-                ['iptables', '-I', 'DOCKER-USER', '-o', macvlan_interface, '-s', dst_ip, '-j', 'ACCEPT'],
-                check=True,
-                capture_output=True
-            )
-            applied_rules.append(f"filter DOCKER-USER -o {macvlan_interface} -s {dst_ip} -j ACCEPT")
-            logger.info(f"✓ Applied DOCKER-USER outgoing (macvlan) rule")
-            
-            # Rule 5: FORWARD - Allow outbound from bridge (THE CRITICAL FIX)
-            # This allows reply packets to exit the Docker bridge
-            subprocess.run(
-                ['iptables', '-I', 'FORWARD', '-i', bridge_interface, '-s', dst_ip, '-j', 'ACCEPT'],
-                check=True,
-                capture_output=True
-            )
-            applied_rules.append(f"filter FORWARD -i {bridge_interface} -s {dst_ip} -j ACCEPT")
-            logger.info(f"✓ Applied FORWARD rule (critical fix for reply packets)")
-            
-            logger.info(f"Successfully configured all 5 NAT rules for {src_ip} → {dst_ip}")
+            # Define rule configurations
+            RULES_CONFIG = [
+                {
+                    'description': 'DNAT - Incoming: Route external traffic to container',
+                    'args': ['iptables', '-t', 'nat', '-A', 'PREROUTING', '-d', '{src_ip}', '-j', 'DNAT', '--to-destination', '{dst_ip}'],
+                    'applied_rule': lambda src_ip, dst_ip, macvlan_interface, bridge_interface: f"nat PREROUTING -d {src_ip} -j DNAT --to-destination {dst_ip}",
+                    'log': "✓ Applied DNAT rule"
+                },
+                {
+                    'description': 'SNAT - Outgoing: Make replies appear from macvlan IP',
+                    'args': ['iptables', '-t', 'nat', '-A', 'POSTROUTING', '-s', '{dst_ip}', '-j', 'SNAT', '--to-source', '{src_ip}'],
+                    'applied_rule': lambda src_ip, dst_ip, macvlan_interface, bridge_interface: f"nat POSTROUTING -s {dst_ip} -j SNAT --to-source {src_ip}",
+                    'log': "✓ Applied SNAT rule"
+                },
+                {
+                    'description': 'DOCKER-USER - Accept incoming to container',
+                    'args': ['iptables', '-I', 'DOCKER-USER', '-d', '{dst_ip}', '-j', 'ACCEPT'],
+                    'applied_rule': lambda src_ip, dst_ip, macvlan_interface, bridge_interface: f"filter DOCKER-USER -d {dst_ip} -j ACCEPT",
+                    'log': "✓ Applied DOCKER-USER incoming rule"
+                },
+                {
+                    'description': 'DOCKER-USER - Force outbound via macvlan0 only',
+                    'args': ['iptables', '-I', 'DOCKER-USER', '-o', '{macvlan_interface}', '-s', '{dst_ip}', '-j', 'ACCEPT'],
+                    'applied_rule': lambda src_ip, dst_ip, macvlan_interface, bridge_interface: f"filter DOCKER-USER -o {macvlan_interface} -s {dst_ip} -j ACCEPT",
+                    'log': "✓ Applied DOCKER-USER outgoing (macvlan) rule"
+                },
+                {
+                    'description': 'FORWARD - Allow outbound from bridge (THE CRITICAL FIX)',
+                    'args': ['iptables', '-I', 'FORWARD', '-i', '{bridge_interface}', '-s', '{dst_ip}', '-j', 'ACCEPT'],
+                    'applied_rule': lambda src_ip, dst_ip, macvlan_interface, bridge_interface: f"filter FORWARD -i {bridge_interface} -s {dst_ip} -j ACCEPT",
+                    'log': "✓ Applied FORWARD rule (critical fix for reply packets)"
+                }
+            ]
+
+            # Apply each rule from the configuration
+            for rule in RULES_CONFIG:
+                args = [a.format(src_ip=src_ip, dst_ip=dst_ip, macvlan_interface=macvlan_interface, bridge_interface=bridge_interface) for a in rule['args']]
+                subprocess.run(
+                    args,
+                    check=True,
+                    capture_output=True
+                )
+                applied_rules.append(rule['applied_rule'](src_ip, dst_ip, macvlan_interface, bridge_interface))
+                logger.info(rule['log'])
+
+            logger.info(f"Successfully configured all {len(RULES_CONFIG)} NAT rules for {src_ip} → {dst_ip}")
             
             return {
                 'success': True,
