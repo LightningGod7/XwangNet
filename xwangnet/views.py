@@ -493,45 +493,60 @@ def deployment_detail(request, deployment_id):
     })
 
 def add_containers_to_deployment(request, deployment_id):
-    if request.method == 'POST':
+    # Validate HTTP method
+    if request.method != 'POST':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Method not allowed. Use POST.'
+        }, status=405)
+    
+    try:
+        deployment = get_object_or_404(Deployment, id=deployment_id)
+        
+        # Parse JSON body with error handling
         try:
-            deployment = get_object_or_404(Deployment, id=deployment_id)
             data = json.loads(request.body)
             device_counts = data.get('device_counts', {})
-            
-            for device_id, count in device_counts.items():
-                device = DeviceTemplate.objects.get(id=device_id)
-                for i in range(count):
-                    # Generate unique hostname
-                    base_hostname = f"{device.name}-{device.version}"
-                    existing_count = DeployedContainer.objects.filter(
-                        deployment=deployment,
-                        hostname__startswith=base_hostname
-                    ).count()
-                    hostname = f"{base_hostname}-{existing_count + 1}"
-
-                    DeployedContainer.objects.create(
-                        deployment=deployment,
-                        device=device,
-                        hostname=hostname,
-                        status='stopped'
-                    )
-            
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Containers added successfully'
-            })
-            
-        except Exception as e:
+        except json.JSONDecodeError as e:
             return JsonResponse({
                 'status': 'error',
-                'message': str(e)
-            }, status=500)
-            
-    return JsonResponse({
-        'status': 'error',
-        'message': 'Method not allowed'
-    }, status=405)
+                'message': f'Invalid JSON: {str(e)}'
+            }, status=400)
+        
+        if not device_counts:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'No devices specified'
+            }, status=400)
+        
+        for device_id, count in device_counts.items():
+            device = DeviceTemplate.objects.get(id=device_id)
+            for i in range(count):
+                # Generate unique hostname
+                base_hostname = f"{device.name}-{device.version}"
+                existing_count = DeployedContainer.objects.filter(
+                    deployment=deployment,
+                    hostname__startswith=base_hostname
+                ).count()
+                hostname = f"{base_hostname}-{existing_count + 1}"
+
+                DeployedContainer.objects.create(
+                    deployment=deployment,
+                    device=device,
+                    hostname=hostname,
+                    status='stopped'
+                )
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': 'Containers added successfully'
+        })
+        
+    except Exception as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
 
 def create_deployment(request):
     if request.method == 'POST':
@@ -557,9 +572,30 @@ def create_deployment(request):
     return JsonResponse({'status': 'error'}, status=400)
 
 def toggle_network(request, deployment_id):
+    # Validate HTTP method
+    if request.method != 'POST':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Method not allowed. Use POST.'
+        }, status=405)
+    
     deployment = get_object_or_404(Deployment, id=deployment_id)
-    data = json.loads(request.body)
-    action = data.get('action')
+    
+    # Parse JSON body with error handling
+    try:
+        data = json.loads(request.body)
+        action = data.get('action')
+    except json.JSONDecodeError as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Invalid JSON: {str(e)}'
+        }, status=400)
+    
+    if not action:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Action parameter is required'
+        }, status=400)
     
     try:
         if action == 'up' and deployment.network_status == 'down':
@@ -765,9 +801,30 @@ def ensure_webtop_network(deployment_id):
     return webtop_network
 
 def container_action(request, container_id):
+    # Validate HTTP method
+    if request.method != 'POST':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Method not allowed. Use POST.'
+        }, status=405)
+    
     container = get_object_or_404(DeployedContainer, id=container_id)
-    data = json.loads(request.body)
-    action = data.get('action')
+    
+    # Parse JSON body with error handling
+    try:
+        data = json.loads(request.body)
+        action = data.get('action')
+    except json.JSONDecodeError as e:
+        return JsonResponse({
+            'status': 'error',
+            'message': f'Invalid JSON: {str(e)}'
+        }, status=400)
+    
+    if not action:
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Action parameter is required'
+        }, status=400)
     
     try:
         if action == 'start' and container.deployment.network_status == 'up':
