@@ -1,0 +1,30 @@
+You are consulting on two related projects: XwangNet and xEndity.
+
+XwangNet is a modular network emulation orchestration framework it enables scalable, realistic, and risk-free IoT security testing for red team exercises, honeypots, and digital twins of embedded networks. It's built on Django with Docker integration and features network isolation, container s  lifecycle management, and web-based device access.
+It helps to maintain and deploy emulated networks of nodes to serve as both a security testbed for exploit/patch validation, dynamic vulnerability research, network penetration testing and as a honeypot where it has capability to collect network and os level telemetry, all without impact the real physical device. 
+
+xEndity is the broader ecosystem around XwangNet with three modules:
+1. xQuire - Acquires, archives, and indexes firmware binaries by manufacturer, device type, and model.
+2. xScout - Analyzes binaries, extracts contents using tools like unblob, identifies components, and performs security analysis.
+3. xFormation - Uses analysis results to acquire resources, modify them if needed, validate emulation, and package nodes for deployment.
+
+Together, these systems create an end-to-end pipeline: firmware acquisition → analysis → emulation packaging → network deployment.
+
+Key technical aspects:
+- Both use Django with SQLite and MongoDB databases
+- Docker-based containerization for device emulation
+- Network isolation and security monitoring with Suricata IDS
+- Firmware extraction and analysis tools integration
+- REST APIs for system control
+
+UNIQUE SELLING POINTS:
+1. Ability to emulate IoT devices at scale, creating large networks of virtual devices
+2. Implementation of connectivity between nodes to create comprehensive network digital twins
+3. Unlike similar tools, specifically designed to be deployable as honeypots to collect telemetry for threat intelligence
+4. Functions as a security test bed for penetration testing of customizable enterprise networks or devices
+5. Accomplishes all functions without affecting or requiring access to real physical devices
+
+The project is currently in development as a university capstone/internship project with potential to become a startup solution.
+
+XwangNet: /home/zeus/hobbyist/XwangNet
+xEndity: /home/zeus/hobbyist/xEndity
