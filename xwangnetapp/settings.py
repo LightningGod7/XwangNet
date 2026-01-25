@@ -25,7 +25,7 @@ SECRET_KEY = "django-insecure-bdkk#!7jqd&ktw8nj9vp@f&dbaub=8m#2=syb=_)rg#+xuh%!w
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['*','localhost', '127.0.0.1']
 
 # Application definition
 
@@ -127,13 +127,21 @@ CHANNEL_LAYERS = {
 }
 
 # Add or modify these settings
-# CSRF_TRUSTED_ORIGINS = ['http://localhost']
-# USE_X_FORWARDED_HOST = True
-# SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+# CSRF Configuration for Cloudflare Tunnel and direct access
+CSRF_TRUSTED_ORIGINS = [
+    'https://xwangnet.keranode.cc',  # Cloudflare tunnel
+    'http://192.168.7.118:8000',      # Direct IP access
+    'http://localhost:8000',           # Local development
+    'http://localhost',
+]
 
-# CSRF_COOKIE_DOMAIN = 'localhost'
-# CSRF_COOKIE_SECURE = False  # Set to True in production with HTTPS
-# CSRF_COOKIE_SAMESITE = 'Lax'
+# Allow Django to recognize the forwarded host from Cloudflare
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# CSRF Cookie settings
+CSRF_COOKIE_SECURE = False  # Set to True only if ALL access is via HTTPS
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 LOGGING = {
     'version': 1,
